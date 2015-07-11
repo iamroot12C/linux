@@ -1,3 +1,13 @@
+/* 날짜 : 2015. 07. 11. (토) 21:24:34 KST
+   드라이빙 : 김대희
+   드라이빙 차 수 : 001.
+
+   드라이빙 시작 ...
+*/
+
+
+
+
 /*
  *  linux/arch/arm/boot/compressed/head.S
  *
@@ -11,7 +21,12 @@
 #include <linux/linkage.h>
 #include <asm/assembler.h>
 
-	.arch	armv7-a
+
+	.arch	armv7-a	// 이 정보를 참고해서 어셈블러가 번역을 함
+			// ARM 어셈블러를 위한 지시어.
+			// 어셈블러에게 이렇게 해라라고 지시하는 거
+			// 32비트 기준 2015.07.11기준 최신 버젼
+
 /*
  * Debugging stuff
  *
@@ -19,16 +34,33 @@
  * 100% relocatable.  Any attempt to do so will result in a crash.
  * Please select one of the following when turning on debugging.
  */
-#ifdef DEBUG
 
-#if defined(CONFIG_DEBUG_ICEDCC)
+/*꿀팁 : #에다가 커서를 놓고  shift+5 누르면 해당 분기문을 이동하며 다님, 블록 알기에 좋음   */
+/*꿀팁 : :r!date 엔터하면 현재 커서에 지금날짜 자동입력.!! */
+#ifdef DEBUG	// DEBUG가 디파인 되있으면 진입
+		// 예, 빌드옵션에서 디버그를 설정해 주던지 등
 
-#if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K) || defined(CONFIG_CPU_V7)
-		.macro	loadsp, rb, tmp
+#if defined(CONFIG_DEBUG_ICEDCC) // 또 얘가 설정되있으면 쭉쭉 진행
+				//If you define CP14 debug coprocessor, use the following macro definitions. 
+				// arm/ 디렉토리에서 $ make ARCH=arm menuconfig해서 화면 나오면, 커널 디버깅 해제하고 메이크하면
+				// 여기부분 통과하는 새로운 커널이 완성! 
+				// 여기서 menuconfig 한 내용은 kconfig파일의 내용을 이용해서 화면에 뿌려주고
+				// menuconfig에서 커널 디버깅 해제하고 저장하면 커널소스윗단의 .config파일에 저장되어 새로운 커널이 완성!
+				// 그리고 kconfig파일은 지금 이 파일의 부모디렉터리에 있습니다.
+
+#if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K) || defined(CONFIG_CPU_V7)	// ARM버젼이 이럴 떄 진입
+		.macro	loadsp, rb, tmp			// 이런게 여러게 정의되어있는데 상황에 맞게 정의될수 있다.
 		.endm
-		.macro	writeb, ch, rb
-		mcr	p14, 0, \ch, c0, c5, 0
+		.macro	writeb, ch, rb			// 이렇게만 치면 아래 긴~ 명령어가 실행된다.
+		mcr	p14, 0, \ch, c0, c5, 0		// 이렇게 길게쓰지말고 위의 라인처럼 간략히 써서 사용하자는 취지.
+							// c0, c5 코 프로세서에서 쓰는 레지스터 같다.
 		.endm
+
+/*
+   드라이빙 끝 ... 150711
+*/
+
+
 #elif defined(CONFIG_CPU_XSCALE)
 		.macro	loadsp, rb, tmp
 		.endm
