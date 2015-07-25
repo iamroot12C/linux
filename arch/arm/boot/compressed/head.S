@@ -174,40 +174,89 @@ start:
    Name : Eunhwan Shin
    End Driving ... 
 */
+<<<<<<< HEAD
  THUMB(		adr	r12, BSYM(1f)	)	//  
  THUMB(		bx	r12		)
+=======
+
+
+/*
+   Date : 2015. 07. 25. (토) 18:xx:xx KST
+   Source Driving presenter : Hyeonjun Shin
+   Driving count : 003.
+
+   Start Driving ...
+*/
+ THUMB(		adr	r12, BSYM(1f)	)	//V5부터 Thumb / ARM 모드 지원. THUMB모드일때 이 명령어를 수행함. 상대주소값 BSYM(1f)를 R12에 저장함.
+//BSYM - 주소를 1개 증가시켜주고(명령어 padding), 1f로 라벨을 저장함.
+//BSYM매크로는 레이블 + 1(word) 한 주소를 나타냄. THUMB에서는 16bit, 2Byte.
+
+ THUMB(		bx	r12		) //BX : ARM-THUMB 모드변환명령어, r12가 가리키는곳으로 jump
+//bx로 점프하면 하단의 ARM_BE8(setend...) 로 감
+>>>>>>> 113006087d60f25db0a363b359c55f9ece3c1b07
 
 		.word	_magic_sig	@ Magic numbers to help the loader
-		.word	_magic_start	@ absolute load/run zImage address
+//로더가 불러들일때 엉뚱한 이미지가 올 수 있기때문에 일정한 넘버를 체크하여 일치하는 이미지를 판단하게끔 함.
+//ELF의 헤더에서 매직넘버를 체크할 수 있다.
+//LINUX KERNEL IMAGE임을 zimage를 읽은 뒤 확인함.
+//magic number 정의는 vmlinux.lds.S에 있음.
+//Line 68~70, ZIMAGE_MAGIC은 10에.
+		.word	_magic_start	@ absolute load/run zImage address//
 		.word	_magic_end	@ zImage end address
 		.word	0x04030201	@ endianness flag
 
- THUMB(		.thumb			)
+ THUMB(		.thumb			) //Assembly Directive로서 실행되지는 않음.
+			//Assembler가 이후 코드를 THUMB으로 해석하도록 하는 지시어.
+			//THUMB으로 진입했다면 이후 코드들도 전부 THUMB으로 실행함.
 1:
  ARM_BE8(	setend	be		)	@ go BE8 if compiled for BE8
- AR_CLASS(	mrs	r9, cpsr	)
+//BIG ENDIAN지원하는경우 big endian 모드로 동작하게 함.
+//v7이 big endian을 지원함. 
+//default 는 little endian.
+
+ AR_CLASS(	mrs	r9, cpsr	) //CPSR값을 r9로 로드. mrs가 move to register from special register
+//AR_CLASS는 arm v7a, v7a일때 실행.
+
 #ifdef CONFIG_ARM_VIRT_EXT
+//가상화기술에 관한 내용. ARM V7 ARCH가 지원함.
+//커널이 가상화설정이 되어있으면 아래 실행.
 		bl	__hyp_stub_install	@ get into SVC mode, reversibly
+		
+	// /arch/arm/kernel/hyp-stub.S 의 매크로를 통해 line 40의 store_primary_cpu_mode 매크로를 실행시킴.
 #endif
 		mov	r7, r1			@ save architecture ID
+//r1의 데이터를 r7에 저장
 		mov	r8, r2			@ save atags pointer
+//r2의 데이터를 r8에 저장
+//atag는 환경변수 설정을 가지고 있는 데이터 모음
 
-#ifndef CONFIG_CPU_V7M
+//앞으로 r1과 r2가 사용될 것이므로 r7, r8 로 옮겨놓음.
+
+
+#ifndef CONFIG_CPU_V7M 
 		/*
 		 * Booting from Angel - need to enter SVC mode and disable
 		 * FIQs/IRQs (numeric definitions from angel arm.h source).
 		 * We only do this if we were in user mode on entry.
 		 */
-		mrs	r2, cpsr		@ get current mode
-		tst	r2, #3			@ not user?
-		bne	not_angel
+		mrs	r2, cpsr		@ get current mode //CPSR값을 R2로 옮김
+		tst	r2, #3			@ not user?	//user모드인지 검사해서
+		bne	not_angel				//아니면 not_angel로 이동
 		mov	r0, #0x17		@ angel_SWIreason_EnterSVC
- ARM(		swi	0x123456	)	@ angel_SWI_ARM
- THUMB(		svc	0xab		)	@ angel_SWI_THUMB
+ ARM(		swi	0x123456	)	@ angel_SWI_ARM // 0x17 매개변수를 r0에 넣고
+								//0x123456 번 swi를 실행함.
+ THUMB(		svc	0xab		)	@ angel_SWI_THUMB //thumb이면 0xab를 svc함?
 not_angel:
-		safe_svcmode_maskall r0
+		safe_svcmode_maskall r0		//r0를 매개변수로  safe_svcmode_maskall 수행.
+// arch/arm/include/asm/assembler.h에 정의됨
+// LINE 324.
+						//svc모드를 수행함
+						
 		msr	spsr_cxsf, r9		@ Save the CPU boot mode in
 						@ SPSR
+
+//r9에 svc 모드 변경 전 cpu의 모드가 저장되어있음. 212라인 AR_CLASS, svc모드 진입전에 저장해놨음.
+
 #endif
 		/*
 		 * Note that some cache flushing and other stuff may
@@ -219,9 +268,14 @@ not_angel:
 		 * by the linker here, but it should preserve r7, r8, and r9.
 		 */
 
+//<<<<<<<<<<<<여기서부터 text영역이 시작>>>>>>>>>>>>>>
 		.text
 
 #ifdef CONFIG_AUTO_ZRELADDR
+//압축된 zimage를 auto로 할거면 이쪽으로 진입.
+//아니면 else로 진입함.
+//makefile에 정의할 수 있음.
+
 		/*
 		 * Find the start of physical memory.  As we are executing
 		 * without the MMU on, we are in the physical address space.
@@ -239,12 +293,21 @@ not_angel:
 		 * are already placing their zImage in (eg) the top 64MB
 		 * of this range.
 		 */
-		mov	r4, pc
-		and	r4, r4, #0xf8000000
+		//부트로더가 상위 128MB 공간에 기본적으로 ZIMAGE를 불러오기 때문에
+		//이와 같은 연산을 수행함.
+
+		mov	r4, pc		//다음 실행할 명령의 주소를 r4로 이동
+		and	r4, r4, #0xf8000000	//pc값을 비교하여 메모리 주소 위치를 확인.
+						//128MB의 배수 위치인지 확인.
+						
+
 		/* Determine final kernel image address. */
-		add	r4, r4, #TEXT_OFFSET
-#else
-		ldr	r4, =zreladdr
+		add	r4, r4, #TEXT_OFFSET	//위에서 계산한 주소값(128MB의 배수)에 TEXT OFFSET을 더하여 R4에 저장
+#else			//ZIMAGE를 AUTOLOAD할게 아니면
+		ldr	r4, =zreladdr		//ZIMAGE LOCATION을 R4에 저장한다.
+						//IMAGE를 임의의 위치로 재배치할때 사용할 수 있음.
+	//zreladdr의 값은 board에 따라 다르다.
+	//Makefile.boot에 zreladdr값이 정의되어있음.
 #endif
 
 		/*
@@ -253,13 +316,40 @@ not_angel:
 		 * Given that r4 > &_end is most unfrequent, we add a rough
 		 * additional 1MB of room for a possible appended DTB.
 		 */
-		mov	r0, pc
-		cmp	r0, r4
-		ldrcc	r0, LC0+32
-		addcc	r0, r0, pc
-		cmpcc	r4, r0
-		orrcc	r4, r4, #1		@ remember we skipped cache_on
-		blcs	cache_on
+//DTB는 커널 이미지 가장 끝에 1MB공간에 배치함.
+//4000~8000번지까지 페이지테이블을 배치하는 공간.
+
+		mov	r0, pc		//pc값을 r0로 이동
+		cmp	r0, r4		//r0와 r4값을 비교 r0-r4 가 음수면 carry발생.
+					//즉, r0 < r4일때 cc니모닉이 수행됨.
+					//r4에 압축해제된 커널의 주소가 저장됨
+					//r0의 pc값과 비교해서
+
+					//만약에 pc값이 현 수행중인 커널위치보다 작으면
+					//이상하니까 재배치!
+					//부트로더의 버그를 대비해서 ???
+
+		ldrcc	r0, LC0+32	//cc = carry clear carry flag가 0이면 수행.
+					//LC0+32 한 값을 r0레지스터에 1워드 저장.
+
+					//지금 코드의 현위치와 비교하여, 
+
+		addcc	r0, r0, pc	// r0 = r0 + pc
+		cmpcc	r4, r0		// relocation된 주소와 비교해서 r4가 작으면,
+					// r4에 1비트를 set함.??
+		orrcc	r4, r4, #1		@ remember we skipped cache on
+					// 주소에 1비트를 set해서 나중에 cache 설정할지 안할지의 여부를 설정함.
+		blcs	cache_on	//r4가 작으면, orrcc를 하고, 아니면 blcs로 이동
+
+
+//여기까지
+
+/*
+   Date : 2015. 07. 25. (토) 21:36:52 KST
+
+   Name : Hyeonjun Shin
+   End Driving ... 
+*/
 
 restart:	adr	r0, LC0
 		ldmia	r0, {r1, r2, r3, r6, r10, r11, r12}
@@ -649,9 +739,11 @@ params:		ldr	r0, =0x10000100		@ params_phys for RPC
  * This routine must preserve:
  *  r4, r7, r8
  */
-		.align	5
+		.align	5 // instruction cache = 2^5 = 32Byte로 정렬.
 cache_on:	mov	r3, #8			@ cache_on function
-		b	call_cache_fn
+					//8을 r3에 저장한 뒤
+		b	call_cache_fn	//이동
+					//
 
 /*
  * Initialize the highest priority protection region, PR7
@@ -721,17 +813,35 @@ __armv3_mpu_cache_on:
 #define CB_BITS 0x0c
 #endif
 
-__setup_mmu:	sub	r3, r4, #16384		@ Page directory size
-		bic	r3, r3, #0xff		@ Align the pointer
-		bic	r3, r3, #0x3f00
+__setup_mmu:	sub	r3, r4, #16384		@ Page directory size 16KB임.
+		bic	r3, r3, #0xff		@ Align the pointer, 8비트를 마스킹해서
+		bic	r3, r3, #0x3f00		//뒤의 8비트를 0으로 클리어, 32KB의 윗쪽 어드레스만 남음.
+//r3에는 relocation된 start번지가 저장된다.
+
+//	0xff   = 1111 1111
+//	0x3f00 = 1111 1100 0000 0000
+//	
+
+
 /*
  * Initialise the page tables, turning on the cacheable and bufferable
  * bits for the RAM area only.
  */
-		mov	r0, r3
-		mov	r9, r0, lsr #18
-		mov	r9, r9, lsl #18		@ start of RAM
+		mov	r0, r3			//r0 = r3 코드 시작된 지점을 r0로.
+		mov	r9, r0, lsr #18		//18비트씩 R0를 Shift Right해서 R9로.
+		mov	r9, r9, lsl #18		//R9을 Shift Left 18비트 하여 R9로.
+						//앞의 14비트가 남는다.
+						//@ start of RAM, Physical Base Address의 윗쪽단이 커널 코드가 올라간 메모리 영역.
+						//R9에는 256KB 번지째 숫자가 남음.
+
 		add	r10, r9, #0x10000000	@ a reasonable RAM size
+						//천만번지(256MB)를 R9에 더해서 R10으로.
+
+						//8000번지 위에 있는 페이지테이블을 생성하는중..
+=========================== 
+2015. 07. 25. (토) 21:35:30 KST
+===========================
+
 		mov	r1, #0x12		@ XN|U + section mapping
 		orr	r1, r1, #3 << 10	@ AP=11
 		add	r2, r3, #16384
@@ -796,12 +906,14 @@ __armv4_mmu_cache_on:
 		mov	pc, r12
 
 __armv7_mmu_cache_on:
-		mov	r12, lr
-#ifdef CONFIG_MMU
-		mrc	p15, 0, r11, c0, c1, 4	@ read ID_MMFR0
-		tst	r11, #0xf		@ VMSA
-		movne	r6, #CB_BITS | 0x02	@ !XN
-		blne	__setup_mmu
+		mov	r12, lr		//링크레지스터값을 r12에 이동.
+#ifdef CONFIG_MMU			//MMU가 설정되어있다면
+		mrc	p15, 0, r11, c0, c1, 4	@ read ID_MMFR0 -> r11로 저장
+		tst	r11, #0xf		@ VMSA	Virtual Memory System Architecture
+						//이 다 되었는가 확인하고
+		movne	r6, #CB_BITS | 0x02	@ !XN	//설정이 안되어있으면 캐시와 버퍼비트를 0x02와  OR해서 r6에 잡아놓은 다음에
+
+		blne	__setup_mmu		//MMU 설정하게끔 이동.
 		mov	r0, #0
 		mcr	p15, 0, r0, c7, c10, 4	@ drain write buffer
 		tst	r11, #0xf		@ VMSA
@@ -878,10 +990,12 @@ __common_mmu_cache_on:
  *  r12 = corrupted
  */
 
-call_cache_fn:	adr	r12, proc_types
-#ifdef CONFIG_CPU_CP15
+call_cache_fn:	adr	r12, proc_types  //proc_types 의 주소를 r12에 저장한 후
+#ifdef CONFIG_CPU_CP15	//CP15가 설정되어있으면
 		mrc	p15, 0, r9, c0, c0	@ get processor ID
-#elif defined(CONFIG_CPU_V7M)
+			//R9에 MPIDR 레지스터에 있는 값을 저장한다.
+
+#elif defined(CONFIG_CPU_V7M)//만약 V7M이 정의되어있다면
 		/*
 		 * On v7-M the processor id is located in the V7M_SCB_CPUID
 		 * register, but as cache handling is IMPLEMENTATION DEFINED on
@@ -890,17 +1004,19 @@ call_cache_fn:	adr	r12, proc_types
 		 * __armv7_mmu_cache_{on,off,flush}) would be selected which
 		 * use cp15 registers that are not implemented on v7-M.
 		 */
-		bx	lr
-#else
-		ldr	r9, =CONFIG_PROCESSOR_ID
+		bx	lr //원래대로 복귀한다.
+#else//V7 아키텍터가 아니면
+		ldr	r9, =CONFIG_PROCESSOR_ID //프로세서ID를 R9에 저장한다.
 #endif
-1:		ldr	r1, [r12, #0]		@ get value
-		ldr	r2, [r12, #4]		@ get mask
-		eor	r1, r1, r9		@ (real ^ match)
-		tst	r1, r2			@       & mask
- ARM(		addeq	pc, r12, r3		) @ call cache function
- THUMB(		addeq	r12, r3			)
- THUMB(		moveq	pc, r12			) @ call cache function
+1:		ldr	r1, [r12, #0]		@ get value //R12 + 0번지의 값을 r1에 저장
+		ldr	r2, [r12, #4]		@ get mask  //R12 + 4번지의 값을 r2에 저장
+		eor	r1, r1, r9		@ (real ^ match) //r1과 r9의 값이 같은지 판별해서
+		tst	r1, r2			@       & mask   //r1 r2 마스크값 비교
+ ARM(		addeq	pc, r12, r3		) @ call cache function //프로세서 ID가 ARM일경우 Cortex 등등인지를 확인하고, PC값에 값을 저장.
+ THUMB(		addeq	r12, r3			) //THUMB이면 R3에 R12값 더해서 R12에 저장.
+ THUMB(		moveq	pc, r12			) @ call cache function //R12값을 PC로 복사.
+						//이제 이동함.
+
 		add	r12, r12, #PROC_ENTRY_SIZE
 		b	1b
 
@@ -922,7 +1038,7 @@ call_cache_fn:	adr	r12, proc_types
 		.type	proc_types,#object
 proc_types:
 		.word	0x41000000		@ old ARM ID
-		.word	0xff00f000
+		.word	0xff00f000		//번지저장 마스크 후 복귀.
 		mov	pc, lr
  THUMB(		nop				)
 		mov	pc, lr
