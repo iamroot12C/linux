@@ -38,11 +38,16 @@ ENTRY(__boot_cpu_mode)
 	 * Save the primary CPU boot mode. Requires 3 scratch registers.
 	 */
 	.macro	store_primary_cpu_mode	reg1, reg2, reg3
-	mrs	\reg1, cpsr
-	and	\reg1, \reg1, #MODE_MASK
+	mrs	\reg1, cpsr cpsr->r1
+	and	\reg1, \reg1, #MODE_MASK r1&modemask
 	adr	\reg2, .L__boot_cpu_mode_offset
+r2에 l_boot 레이블을 저장
 	ldr	\reg3, [\reg2]
+r2의 주소값을 r3로 로드하고
 	str	\reg1, [\reg2, \reg3]
+r1의 값을 r2+r3의 주소가 가리키는 곳에 저장함.
+
+현재 cpsr값의 모드비트값만 남기고 이 레이블을 저장함.
 	.endm
 
 	/*

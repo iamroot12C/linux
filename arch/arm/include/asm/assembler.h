@@ -300,6 +300,14 @@
 	mov	\reg, #\mode
 	msr	cpsr_c, \reg
 	.endm
+//THUMB 2는 ARM처럼 4BYTE(32bit)를 사용함.
+//THUMB 1은 16bit.
+//모드와 레지스터를 인자로 받아서
+//mode정보를 레지스터에 저장 후
+//cpsr의 컨트롤 필드에 설정한다
+//mode정보를 레지스터에 저장 후
+//cpsr의 컨트롤 필드에 설정한다..
+
 #else
 	.macro	setmode, mode, reg
 	msr	cpsr_c, #\mode
@@ -316,18 +324,40 @@
 .macro safe_svcmode_maskall reg:req
 #if __LINUX_ARM_ARCH__ >= 6 && !defined(CONFIG_CPU_V7M)
 	mrs	\reg , cpsr
+	//cpsr을 레지스터에 저장
+
 	eor	\reg, \reg, #HYP_MODE
+	//하이퍼바이저모드와 레지스터값을 xor
+
 	tst	\reg, #MODE_MASK
+	//modemask와 위에서 연산한 값을 비교함
+
 	bic	\reg , \reg , #MODE_MASK
+	//mode_mask 를 제외한 부분만 남긴다.
+
 	orr	\reg , \reg , #PSR_I_BIT | PSR_F_BIT | SVC_MODE
-THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
+	//I,F,SVCMODE를 켠다.
+
+THUMB(	orr	\reg , \reg , #PSR_T_BIT	)//THUMB 모드일경우 T비트까지 셋팅한다.
 	bne	1f
 	orr	\reg, \reg, #PSR_A_BIT
+//ARM모드를 켜고, 
 	adr	lr, BSYM(2f)
+//2f + 1(word)의 값을 lr에 저장함.
+
 	msr	spsr_cxsf, \reg
+//reg의 값으로 spsr의 플래그 레지스터를 설정함.
+
 	__MSR_ELR_HYP(14)
+//14번 레지스터(링크레지스터)의 값을 ELR_HYPERVISOR이라는 레지스터로 옮긴다.
 	__ERET
+//하이퍼바이저에서 리턴하라는 의미.
+//ELR의 값을 PC로 옮기고, SPSR의 값을 CPSR로 옮김.
+
 1:	msr	cpsr_c, \reg
+//user모드가 아니면
+//cpsr_control 필드를 레지스터쪽으로 옮겨줌.
+//최 하위 8비트씩 잘라서 옮김.
 2:
 #else
 /*
@@ -335,6 +365,8 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
  * (akita, Sharp Zaurus C-1000, PXA270-based)
  */
 	setmode	PSR_F_BIT | PSR_I_BIT | SVC_MODE, \reg
+//CPSR의 F,I,Service모드를 설정한다.
+//299라인에 setmode 정의되어있음.
 #endif
 .endm
 
