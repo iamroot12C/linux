@@ -174,7 +174,7 @@ start:
    Name : Eunhwan Shin
    End Driving ... 
 */
- THUMB(		adr	r12, BSYM(1f)	)	// 
+ THUMB(		adr	r12, BSYM(1f)	)	//  
  THUMB(		bx	r12		)
 
 		.word	_magic_sig	@ Magic numbers to help the loader
