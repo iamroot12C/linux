@@ -94,13 +94,14 @@
 		senduart \ch, \rb	// uart로 한 char 전송 (../include/debug/ 매크로 참고)
 		.endm
 
+// uart를 사용한다는 가정하에 관련 세팅을 다음과 같이 해줌.
 #if defined(CONFIG_ARCH_SA1100)
 		.macro	loadsp, rb, tmp
 		mov	\rb, #0x80000000	@ physical base address	// SA1100 아키텍처 사용 시 uart base address 지정
 #ifdef CONFIG_DEBUG_LL_SER3
-		add	\rb, \rb, #0x00050000	@ Ser3	// 시리얼 3번 채널 사용 시 uart base address 지정
+		add	\rb, \rb, #0x00050000	@ Ser3	// 시리얼 3번 채널 사용 시 uart base address 지정, 5만번지 위로
 #else
-		add	\rb, \rb, #0x00010000	@ Ser1	// 시리얼 1번 채널 사용 시 uart base address 지정
+		add	\rb, \rb, #0x00010000	@ Ser1	// 시리얼 1번 채널 사용 시 uart base address 지정, 1만번지 위로
 #endif
 		.endm
 #else
@@ -174,11 +175,6 @@ start:
    Name : Eunhwan Shin
    End Driving ... 
 */
-<<<<<<< HEAD
- THUMB(		adr	r12, BSYM(1f)	)	//  
- THUMB(		bx	r12		)
-=======
-
 
 /*
    Date : 2015. 07. 25. (토) 18:xx:xx KST
@@ -193,7 +189,6 @@ start:
 
  THUMB(		bx	r12		) //BX : ARM-THUMB 모드변환명령어, r12가 가리키는곳으로 jump
 //bx로 점프하면 하단의 ARM_BE8(setend...) 로 감
->>>>>>> 113006087d60f25db0a363b359c55f9ece3c1b07
 
 		.word	_magic_sig	@ Magic numbers to help the loader
 //로더가 불러들일때 엉뚱한 이미지가 올 수 있기때문에 일정한 넘버를 체크하여 일치하는 이미지를 판단하게끔 함.
@@ -1430,12 +1425,12 @@ phex:		adr	r3, phexbuf	// phexbuf의 주소 값을 r3에 저장
 1:		subs	r1, r1, #1	// r1에서 1 빼기 (len-1)
 		movmi	r0, r3		// N flag가 서있으면, r3의 값을 r0에 저장
 		bmi	puts		// N flag가 서있으면, puts로 분기
-		and	r2, r0, #15	// r0의 하위 4bit를 and masking해서 최하위 4bit 값만 남김 
-		mov	r0, r0, lsr #4	// r0의 하위 4bit를 shift
+		and	r2, r0, #15	// r0의 가져온 문자열의   하위 4bit를 and masking해서 최하위 4bit 값만 남김, 즉 한글자만 저장해놔 
+		mov	r0, r0, lsr #4	// r0의 하위 4bit를 shift, 마지막 글자빼고 다시 저장해놔
 		cmp	r2, #10		// r2를 10과 비교
 		addge	r2, r2, #7	// 크면, r2에 7을 더함
-		add	r2, r2, #'0'	// 아스키 코드 '0' 값을 더함
-		strb	r2, [r3, r1]	// 바뀐 값을 r3(phexbuf)에 저장
+		add	r2, r2, #'0'	// 아스키 코드 '0' 값을 더함, 그래야 아스키를 찍지.
+		strb	r2, [r3, r1]	// 아스키로 바뀐 값을 r3(phexbuf)에 저장
 		b	1b		// 반복
 
 @ puts corrupts {r0, r1, r2, r3}
