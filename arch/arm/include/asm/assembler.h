@@ -356,7 +356,7 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)//THUMB 모드일경우 T비트까지 셋�
 
 1:	msr	cpsr_c, \reg
 //user모드가 아니면
-//cpsr_control 필드를 레지스터쪽으로 옮겨줌.
+//레지스터값을 cpsr_control 필드로 복사하여  cpsr의 control 필드를 설정함.
 //최 하위 8비트씩 잘라서 옮김.
 2:
 #else
