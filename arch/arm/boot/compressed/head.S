@@ -43,23 +43,23 @@
 		// 예, 빌드옵션에서 디버그를 설정해 주던지 등
 
 
-#if defined(CONFIG_DEBUG_ICEDCC) // 또 얘가 설정되있으면 쭉쭉 진행
-				 //If you define CP14 debug coprocessor, use the following macro definitions. 
-				 // arm/ 디렉토리에서 $ make ARCH=arm menuconfig해서 화면 나오면, 커널 디버깅 해제하고 메이크하면
-				 // 여기부분 통과하는 새로운 커널이 완성! 
-				 // 여기서 menuconfig 한 내용은 kconfig파일의 내용을 이용해서 화면에 뿌려주고
-				 // menuconfig에서 커널 디버깅 해제하고 저장하면 커널소스윗단의 .config파일에 저장되어 새로운 커널이 완성!
-				 // 그리고 kconfig파일은 지금 이 파일의 부모디렉터리에 있습니다.
+  #if defined(CONFIG_DEBUG_ICEDCC) // 또 얘가 설정되있으면 쭉쭉 진행
+				   // If you define CP14 debug coprocessor, use the following macro definitions. 
+				   // arm/ 디렉토리에서 $ make ARCH=arm menuconfig해서 화면 나오면, 커널 디버깅 해제하고 메이크하면
+				   // 여기부분 통과하는 새로운 커널이 완성! 
+				   // 여기서 menuconfig 한 내용은 kconfig파일의 내용을 이용해서 화면에 뿌려주고
+				   // menuconfig에서 커널 디버깅 해제하고 저장하면 커널소스윗단의 .config파일에 저장되어 새로운 커널이 완성!
+				   // 그리고 kconfig파일은 지금 이 파일의 부모디렉터리에 있습니다.
 
 
 
-#if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K) || defined(CONFIG_CPU_V7) // ARM버젼이 이럴 떄 진입
-		.macro	loadsp, rb, tmp		// 이런게 여러게 정의되어있는데 상황에 맞게 정의될수 있다.
-		.endm
-		.macro	writeb, ch, rb		// 이렇게만 치면 아래 긴~ 명령어가 실행된다.
-		mcr	p14, 0, \ch, c0, c5, 0	// 이렇게 길게쓰지말고 위의 라인처럼 간략히 써서 사용하자는 취지.
+    #if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K) || defined(CONFIG_CPU_V7) 		// ARM버젼이 이럴 떄 진입
+		    .macro	loadsp, rb, tmp		// 이런게 여러게 정의되어있는데 상황에 맞게 정의될수 있다.
+		    .endm
+		    .macro	writeb, ch, rb		// 이렇게만 치면 아래 긴~ 명령어가 실행된다.
+		    mcr	    p14, 0, \ch, c0, c5, 0	// 이렇게 길게쓰지말고 위의 라인처럼 간략히 써서 사용하자는 취지.
 						// c0, c5 코 프로세서에서 쓰는 레지스터 같다.
-		.endm
+		    .endm
 /*
    Date : 2015. 07. 11. (토) 21:24:34 KST
    Name : DaeHee Kim
@@ -72,21 +72,21 @@
 
    Start Driving ...
 */
-#elif defined(CONFIG_CPU_XSCALE)	// xscale 타입의 ARM 일 때 진입
-		.macro	loadsp, rb, tmp
-		.endm
-		.macro	writeb, ch, rb
-		mcr	p14, 0, \ch, c8, c0, 0	// cp14 레지스터 c8(transmit 레지스터)의 내용을 ch에 저장 (디버그 관련 설정)
-		.endm
-#else	// 기타 타입일 때 진입
-		.macro	loadsp, rb, tmp
-		.endm
-		.macro	writeb, ch, rb
-		mcr	p14, 0, \ch, c1, c0, 0
-		.endm
-#endif
+    #elif defined(CONFIG_CPU_XSCALE)	// xscale 타입의 ARM 일 때 진입
+		    .macro	loadsp, rb, tmp
+		    .endm
+		    .macro	writeb, ch, rb
+		    mcr	    p14, 0, \ch, c8, c0, 0	// cp14 레지스터 c8(transmit 레지스터)의 내용을 ch에 저장 (디버그 관련 설정)
+		    .endm
+    #else	// 기타 타입일 때 진입
+		    .macro	loadsp, rb, tmp
+		    .endm
+		    .macro	writeb, ch, rb
+		    mcr	    p14, 0, \ch, c1, c0, 0
+		    .endm
+    #endif
 
-#else	// 디버그(CONFIG_DEBUG_ICEDCC)가 정의 안되어 있을 때 진입 (uart 사용 시)
+  #else		// 디버그(CONFIG_DEBUG_ICEDCC)가 정의 안되어 있을 때 진입 (uart 사용 시)
 
 #include CONFIG_DEBUG_LL_INCLUDE
 
@@ -94,21 +94,22 @@
 		senduart \ch, \rb	// uart로 한 char 전송 (../include/debug/ 매크로 참고)
 		.endm
 
-#if defined(CONFIG_ARCH_SA1100)
-		.macro	loadsp, rb, tmp
-		mov	\rb, #0x80000000	@ physical base address	// SA1100 아키텍처 사용 시 uart base address 지정
-#ifdef CONFIG_DEBUG_LL_SER3
-		add	\rb, \rb, #0x00050000	@ Ser3	// 시리얼 3번 채널 사용 시 uart base address 지정
-#else
-		add	\rb, \rb, #0x00010000	@ Ser1	// 시리얼 1번 채널 사용 시 uart base address 지정
-#endif
-		.endm
-#else
-		.macro	loadsp,	rb, tmp
-		addruart \rb, \tmp	// 내부적으로 MMU 활성화 여부에 따라 address 처리, 시리얼 관련 테스트 (../include/debug/sa1100.S)
-		.endm
-#endif
-#endif
+// uart를 사용한다는 가정하에 관련 세팅을 다음과 같이 해줌.
+    #if defined(CONFIG_ARCH_SA1100)
+		    .macro	loadsp, rb, tmp
+		    mov	    \rb, #0x80000000	@ physical base address	// SA1100 아키텍처 사용 시 uart base address 지정
+      #ifdef CONFIG_DEBUG_LL_SER3
+		      add	\rb, \rb, #0x00050000	@ Ser3	// 시리얼 3번 채널 사용 시 uart base address 지정, 5만번지 위로
+      #else
+		      add	\rb, \rb, #0x00010000	@ Ser1	// 시리얼 1번 채널 사용 시 uart base address 지정, 1만번지 위로
+      #endif
+		      .endm
+    #else
+		    .macro	loadsp,	rb, tmp
+		    addruart \rb, \tmp	// 내부적으로 MMU 활성화 여부에 따라 address 처리, 시리얼 관련 테스트 (../include/debug/sa1100.S)
+		    .endm
+    #endif
+  #endif
 #endif	// 42 라인 DEBUG end
 		.macro  kputc,val	// kputc 매그로 정의 (인자 val)
 		mov	r0, \val	// val을 r0에 저장
@@ -174,7 +175,6 @@ start:
    Name : Eunhwan Shin
    End Driving ... 
 */
-
 
 /*
    Date : 2015. 07. 25. (토) 18:xx:xx KST
@@ -346,35 +346,60 @@ not_angel:
    End Driving ... 
 */
 
-restart:	adr	r0, LC0
-		ldmia	r0, {r1, r2, r3, r6, r10, r11, r12}
-		ldr	sp, [r0, #28]
+/*
+   Date : 2015. 08. 22. (토) 19:03:37 KST
+   Source Driving presenter : Eunhwan Shin
+   Driving count : 004.
+
+   Start Driving ...
+*/
+/* 참고용 (실제 코드 아래에 있음)
+ * LC0에는 링크 시에 linker script (vmlinux.lds.S)를 기준으로 생성된 주소 값이 저장되어 있음.
+LC0:		.word	LC0			@ r1
+		.word	__bss_start		@ r2
+		.word	_end			@ r3
+		.word	_edata			@ r6	// zImage의 끝 주소
+		.word	input_data_end - 4	@ r10 (inflated size location)	// input_data_end에 압축 해제된 zImage의 끝 주소가
+										// 들어가 있으며, (끝 주소 - 4)의 위치에 실제 크기가 담겨 있다.
+										// input_data_end에 대한 정의는 'piggy.gzip(압축파일형식).S'의 형태로 정의되어있다. linker script에 .piggydata 영역으로 정의됨
+		.word	_got_start		@ r11
+		.word	_got_end		@ ip
+		.word	.L_user_stack_end	@ sp
+		.word	_end - restart + 16384 + 1024*1024
+		.size	LC0, . - LC0
+*/
+restart:	adr	r0, LC0					// LC(location counter)O의 주소를 r0에 저장
+		ldmia	r0, {r1, r2, r3, r6, r10, r11, r12}	// r0에 있는 값을 {}안의 레지스터에 차례로 load 함
+		ldr	sp, [r0, #28]				// r0 + 28의 값(@sp)을 sp에 load 함
 
 		/*
 		 * We might be running at a different address.  We need
 		 * to fix up various pointers.
 		 */
 		sub	r0, r0, r1		@ calculate the delta offset
-		add	r6, r6, r0		@ _edata
-		add	r10, r10, r0		@ inflated kernel size location
+						// r0에는 현재 실행 중인 LC0의 주소 값, r1에는 링크 시에 지정된 LC0의 주소 값이
+						// 담겨있다. relocation으로 인해 r0의 값이 변경될 수 있기 때문에 delta offset을
+						// 계산해서 보정함. -> 시작 offset 설정
+		add	r6, r6, r0		@ _edata	// 재지정한 offset에 맞춰 zImage 끝 주소를 다시 잡아줌
+		add	r10, r10, r0		@ inflated kernel size location	// 압축 해재된 zImage의 실제 크기를 다시 잡아줌 
 
 		/*
 		 * The kernel build system appends the size of the
 		 * decompressed kernel at the end of the compressed data
 		 * in little-endian form.
 		 */
-		ldrb	r9, [r10, #0]
-		ldrb	lr, [r10, #1]
-		orr	r9, r9, lr, lsl #8
+		ldrb	r9, [r10, #0]		// r10의 값을 리틀 엔디안 값으로 변환하는 코드 
+		ldrb	lr, [r10, #1]		 
+		orr	r9, r9, lr, lsl #8	
 		ldrb	lr, [r10, #2]
 		ldrb	r10, [r10, #3]
 		orr	r9, r9, lr, lsl #16
-		orr	r9, r9, r10, lsl #24
+		orr	r9, r9, r10, lsl #24	// 변환된 값은 r9에 저장됨
 
 #ifndef CONFIG_ZBOOT_ROM
 		/* malloc space is above the relocated stack (64k max) */
-		add	sp, sp, r0
-		add	r10, sp, #0x10000
+		add	sp, sp, r0		// sp에 delta offset을 반영
+		add	r10, sp, #0x10000	// sp + 64K 의 공간을 malloc space로 확보
 #else
 		/*
 		 * With ZBOOT_ROM the bss/stack is non relocatable,
@@ -385,6 +410,16 @@ restart:	adr	r0, LC0
 #endif
 
 		mov	r5, #0			@ init dtb size to 0
+
+/*
+   Date : 2015. 08. 22. (토) 21:03:37 KST
+   
+   Name : Eunhwan Shin
+   End Driving ...
+*/
+
+
+
 #ifdef CONFIG_ARM_APPENDED_DTB
 /*
  *   r0  = delta
@@ -832,11 +867,11 @@ __setup_mmu:	sub	r3, r4, #16384		@ Page directory size 16KB임.
 		add	r10, r9, #0x10000000	@ a reasonable RAM size
 						//천만번지(256MB)를 R9에 더해서 R10으로.
 
-/*						//8000번지 위에 있는 페이지테이블을 생성하는중..
+						//8000번지 위에 있는 페이지테이블을 생성하는중..
 =========================== 
 2015. 07. 25. (토) 21:35:30 KST
 ===========================
-*/
+
 		mov	r1, #0x12		@ XN|U + section mapping
 		orr	r1, r1, #3 << 10	@ AP=11
 		add	r2, r3, #16384
@@ -1425,12 +1460,12 @@ phex:		adr	r3, phexbuf	// phexbuf의 주소 값을 r3에 저장
 1:		subs	r1, r1, #1	// r1에서 1 빼기 (len-1)
 		movmi	r0, r3		// N flag가 서있으면, r3의 값을 r0에 저장
 		bmi	puts		// N flag가 서있으면, puts로 분기
-		and	r2, r0, #15	// r0의 하위 4bit를 and masking해서 최하위 4bit 값만 남김 
-		mov	r0, r0, lsr #4	// r0의 하위 4bit를 shift
+		and	r2, r0, #15	// r0의 가져온 문자열의   하위 4bit를 and masking해서 최하위 4bit 값만 남김, 즉 한글자만 저장해놔 
+		mov	r0, r0, lsr #4	// r0의 하위 4bit를 shift, 마지막 글자빼고 다시 저장해놔
 		cmp	r2, #10		// r2를 10과 비교
 		addge	r2, r2, #7	// 크면, r2에 7을 더함
-		add	r2, r2, #'0'	// 아스키 코드 '0' 값을 더함
-		strb	r2, [r3, r1]	// 바뀐 값을 r3(phexbuf)에 저장
+		add	r2, r2, #'0'	// 아스키 코드 '0' 값을 더함, 그래야 아스키를 찍지.
+		strb	r2, [r3, r1]	// 아스키로 바뀐 값을 r3(phexbuf)에 저장
 		b	1b		// 반복
 
 @ puts corrupts {r0, r1, r2, r3}
