@@ -410,6 +410,16 @@ restart:	adr	r0, LC0					// LC(location counter)O의 주소를 r0에 저장
 #endif
 
 		mov	r5, #0			@ init dtb size to 0
+
+/*
+   Date : 2015. 08. 22. (토) 21:03:37 KST
+   
+   Name : Eunhwan Shin
+   End Driving ...
+*/
+
+
+
 #ifdef CONFIG_ARM_APPENDED_DTB
 /*
  *   r0  = delta
