@@ -114,13 +114,21 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
 	int memcount = 0;
 	int ret, memsize;
 
-	/* make sure we've got an aligned pointer */
+	/* make sure we've got an aligned pointer */ // align 32bit
 	if ((u32)atag_list & 0x3)
 		return 1;
 
 	/* if we get a DTB here we're done already */
+	// atag_list 가 FDT_MAGIC 과 같으면 변환할 필요가 없음
+	// 이미 atag_list는 fdt 형식으로 제공됨.
 	if (*(u32 *)atag_list == fdt32_to_cpu(FDT_MAGIC))
 	       return 0;
+
+	/*
+	 * 2015. 08. 29. (토) 21:42:30 KST
+	 * Driving end..
+	 * Minkyung Kim
+	 * */
 
 	/* validate the ATAG */
 	if (atag->hdr.tag != ATAG_CORE ||

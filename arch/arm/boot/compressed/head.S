@@ -418,9 +418,26 @@ restart:	adr	r0, LC0					// LC(location counter)O의 주소를 r0에 저장
    End Driving ...
 */
 
+/*
+   2015. 08. 29. (토) 19:02:32 KST
+   Name : Minkyung Kim
+   Start Driving ...
+*/
 
 
-#ifdef CONFIG_ARM_APPENDED_DTB
+
+#ifdef CONFIG_ARM_APPENDED_DTB // DTB가 zImage에 추가되어 있는 경우 CONFIG ON.
+/*
+ DTB 란?
+ Device Tree Binary (Blob) : 주변장치에 대한 정보를 기록한 파일.
+ arch/arm/boot/dts/ 디렉토리 참고
+ *.dts, 혹은 *.dtsi 파일 형식으로 작성 ( Documentation/devicetree.txt 참고)
+ dts 는 시스템 버스에 대한 정보 (bus, power manage, memory,  등)
+ dtsi 는 주변장치 (bus 의 주변장치, uart, gpio 등)
+ bootloader 역할을 하기도 함.
+*/
+
+// 아래 comment 는 현재 register 정보 상태
 /*
  *   r0  = delta
  *   r2  = BSS start
@@ -432,7 +449,7 @@ restart:	adr	r0, LC0					// LC(location counter)O의 주소를 r0에 저장
  *   r8  = atags/device tree pointer
  *   r9  = size of decompressed image
  *   r10 = end of this image, including  bss/stack/malloc space if non XIP
- *   r11 = GOT start
+ *   r11 = GOT start // GOT: Shared library 를 위한 section
  *   r12 = GOT end
  *   sp  = stack pointer
  *
@@ -440,16 +457,17 @@ restart:	adr	r0, LC0					// LC(location counter)O의 주소를 r0에 저장
  * dtb data will get relocated along with the kernel if necessary.
  */
 
-		ldr	lr, [r6, #0]
-#ifndef __ARMEB__
+		ldr	lr, [r6, #0] //zImage 바로 아래 dtb 넣기
+#ifndef __ARMEB__ // endian big
 		ldr	r1, =0xedfe0dd0		@ sig is 0xd00dfeed big endian
 #else
-		ldr	r1, =0xd00dfeed
+		ldr	r1, =0xd00dfeed         // dtb의 magic number??
 #endif
-		cmp	lr, r1
-		bne	dtb_check_done		@ not found
+		cmp	lr, r1                  // if (lr - r1 < 0) -> not equal
+		bne	dtb_check_done		@ not found // lr < r1 이면 not found
+							    // dts 는 zImage 바로 뒤에 있음
 
-#ifdef CONFIG_ARM_ATAG_DTB_COMPAT
+#ifdef CONFIG_ARM_ATAG_DTB_COMPAT // DTB에서 제공하는 bootloader 기능을 사용하는 경우 CONFIG ON
 		/*
 		 * OK... Let's do some funky business here.
 		 * If we do have a DTB appended to zImage, and we do have
@@ -460,28 +478,38 @@ restart:	adr	r0, LC0					// LC(location counter)O의 주소를 r0에 저장
 		*/
 
 		/* Get the initial DTB size */
-		ldr	r5, [r6, #4]
+		ldr	r5, [r6, #4] // r5 에 dtb의 첫번째 데이터(크기?)를 로드
 #ifndef __ARMEB__
-		/* convert to little endian */
+		/* convert to little endian */ // little endian 으로 데이터 변경
+					       // 커널은 little endian 기준으로 작성
 		eor	r1, r5, r5, ror #16
 		bic	r1, r1, #0x00ff0000
 		mov	r5, r5, ror #8
 		eor	r5, r5, r1, lsr #8
 #endif
 		/* 50% DTB growth should be good enough */
-		add	r5, r5, r5, lsr #1
+		add	r5, r5, r5, lsr #1      // r5 = r5 + r5/2
 		/* preserve 64-bit alignment */
-		add	r5, r5, #7
-		bic	r5, r5, #7
+		add	r5, r5, #7		// 0x111 을 add (64bit 는 8byte로 align)
+		bic	r5, r5, #7		// 0x111 bit clear
 		/* clamp to 32KB min and 1MB max */
 		cmp	r5, #(1 << 15)
-		movlo	r5, #(1 << 15)
-		cmp	r5, #(1 << 20)
-		movhi	r5, #(1 << 20)
+		movlo	r5, #(1 << 15) // if (r5 < 32K) r5 = 32KB; 
+		cmp	r5, #(1 << 20) 
+		movhi	r5, #(1 << 20) // if (r5 > 1MB)  r5 = 1M;
+					// dtb 크기를 1.5배 키워서 그 범위를 적당히 clamping 함
 		/* temporarily relocate the stack past the DTB work space */
-		add	sp, sp, r5
+		add	sp, sp, r5 // dtb 의 workspace로 stack base를 추가함
 
-		stmfd	sp!, {r0-r3, ip, lr}
+		stmfd	sp!, {r0-r3, ip, lr}  // ip :내부 프로시저 호출 스크래치? 레지스터
+					      // 함수에서 내부 호출 함수가 있을 때
+ 		      			      // 내부함수의 주소를 ip에 미리 저장해두는 용도
+/*   
+ *   r5  = appended dtb size (still unknown)
+ *   r6  = _edata
+ *   r7  = architecture ID
+ *   r8  = atags/device tree pointer
+*/
 		mov	r0, r8
 		mov	r1, r6
 		mov	r2, r5
@@ -538,7 +566,7 @@ restart:	adr	r0, LC0					// LC(location counter)O의 주소를 r0에 저장
 		add	sp, sp, r5
 dtb_check_done:
 #endif
-
+// dtb 가 없을때..
 /*
  * Check to see if we will overwrite ourselves.
  *   r4  = final kernel address (possibly with LSB set)

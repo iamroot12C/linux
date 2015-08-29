@@ -6,6 +6,8 @@
 #include <string.h>
 
 #define EXTRACT_BYTE(n)	((unsigned long long)((uint8_t *)&x)[n])
+// ((uint8_t*)&x)  == (int8_t*) 인데, macro 이기 때문에 전자와 같이 써야함.
+
 static inline uint16_t fdt16_to_cpu(uint16_t x)
 {
 	return (EXTRACT_BYTE(0) << 8) | EXTRACT_BYTE(1);
@@ -14,6 +16,7 @@ static inline uint16_t fdt16_to_cpu(uint16_t x)
 
 static inline uint32_t fdt32_to_cpu(uint32_t x)
 {
+	// endian 변환
 	return (EXTRACT_BYTE(0) << 24) | (EXTRACT_BYTE(1) << 16) | (EXTRACT_BYTE(2) << 8) | EXTRACT_BYTE(3);
 }
 #define cpu_to_fdt32(x) fdt32_to_cpu(x)
