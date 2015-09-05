@@ -71,7 +71,7 @@ static int _fdt_rw_check_header(void *fdt)
 {
 	FDT_CHECK_HEADER(fdt);
 
-	if (fdt_version(fdt) < 17)
+	if (fdt_version(fdt) < 17/*=0x11, LAST_VERSION*/)
 		return -FDT_ERR_BADVERSION;
 	if (_fdt_blocks_misordered(fdt, sizeof(struct fdt_reserve_entry),
 				   fdt_size_dt_struct(fdt)))
@@ -483,7 +483,7 @@ int fdt_pack(void *fdt)
 
 	FDT_RW_CHECK_HEADER(fdt);
 
-	mem_rsv_size = (fdt_num_mem_rsv(fdt)+1)
+	mem_rsv_size = (fdt_num_mem_rsv(fdt)+1)		// fdt entry 개수만큼 메모리확보.
 		* sizeof(struct fdt_reserve_entry);
 	_fdt_packblocks(fdt, fdt, mem_rsv_size, fdt_size_dt_struct(fdt));
 	fdt_set_totalsize(fdt, _fdt_data_size(fdt));

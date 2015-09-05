@@ -467,7 +467,18 @@ restart:	adr	r0, LC0					// LC(location counter)O의 주소를 r0에 저장
 		bne	dtb_check_done		@ not found // lr < r1 이면 not found
 							    // dts 는 zImage 바로 뒤에 있음
 
+
 #ifdef CONFIG_ARM_ATAG_DTB_COMPAT // DTB에서 제공하는 bootloader 기능을 사용하는 경우 CONFIG ON
+
+		// linux/arch/arm/configs$ grep -rnH CONFIG_ARM_APPENDED_DTB *
+		// 참고
+
+		// DTB를 사용할 것이라고 하고 들어온 상태
+		// 그다음에 여기서는 DTB와 ATAG가 호환할 것이라 하고 들어온 상태	
+		// 여기에 들어왔다는 것은 나중에 DTB를 사용해 개발을 하겠다는 의미.
+		// 즉, Atag 를 FDT로 바꾸어, FDT를 가지고 DTB이용.
+		// DTB를 사용하지 않을거라면  무조건 Atag를 가지고 개발을 했어야 했다.
+
 		/*
 		 * OK... Let's do some funky business here.
 		 * If we do have a DTB appended to zImage, and we do have
@@ -513,7 +524,18 @@ restart:	adr	r0, LC0					// LC(location counter)O의 주소를 r0에 저장
 		mov	r0, r8
 		mov	r1, r6
 		mov	r2, r5
+/*
+   2015. 09. 05. (토) 18:00:32 KST
+   Name : DH Kim
+   start Driving ...
+*/
 		bl	atags_to_fdt
+/*
+   2015. 09. 05. (토) 21:25:32 KST
+   Name : DH Kim
+   End Driving ...
+*/
+
 
 		/*
 		 * If returned value is 1, there is no ATAG at the location
@@ -566,7 +588,7 @@ restart:	adr	r0, LC0					// LC(location counter)O의 주소를 r0에 저장
 		add	sp, sp, r5
 dtb_check_done:
 #endif
-// dtb 가 없을때..
+// dtb 로 개발하지 않을때..
 /*
  * Check to see if we will overwrite ourselves.
  *   r4  = final kernel address (possibly with LSB set)

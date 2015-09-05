@@ -59,7 +59,7 @@ static uint32_t get_cell_size(const void *fdt)
 {
 	int len;
 	uint32_t cell_size = 1;
-	const uint32_t *size_len =  getprop(fdt, "/", "#size-cells", &len);
+	const uint32_t *size_len =  getprop(fdt, "/", "#size-cells", &len); //size-cells라고해서 하드코딩되있음, 그 사이즈를 가져옴.
 
 	if (size_len)
 		cell_size = fdt32_to_cpu(*size_len);
@@ -105,6 +105,10 @@ static void merge_fdt_bootargs(void *fdt, const char *fdt_cmdline)
  *    = 1 -> bad ATAG (may retry with another possible ATAG pointer)
  *    < 0 -> error from libfdt
  */
+
+// FDT (Flattened Device Tree).
+// 커널에서 부트파라미터 넘기는 형식이 atag.!!
+// head.S에서 디바이스트리 정보를 FDT형식에 맞게 전달해주면 굳이 이렇게 변환안해도 됨.
 int atags_to_fdt(void *atag_list, void *fdt, int total_space)
 {
 	struct tag *atag = atag_list;
@@ -131,25 +135,27 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
 	 * */
 
 	/* validate the ATAG */
-	if (atag->hdr.tag != ATAG_CORE ||
-	    (atag->hdr.size != tag_size(tag_core) &&
+	// atag는 반드시 ATAG_CORE부터 시작되어야 함
+	if (atag->hdr.tag != ATAG_CORE ||		// 결국 tag는 ATAG_CORE값이어야하고
+	    (atag->hdr.size != tag_size(tag_core) &&	// size가 tagsize이거나  2이면 넘어감.
+	     						// tag_size에서 (>>2) 하는것은 align을 위한것?
 	     atag->hdr.size != 2))
 		return 1;
 
 	/* let's give it all the room it could need */
-	ret = fdt_open_into(fdt, fdt, total_space);
+	ret = fdt_open_into(fdt, fdt, total_space);	// fdt에 저장하기위해 fdt할당
 	if (ret < 0)
 		return ret;
 
 	for_each_tag(atag, atag_list) {
-		if (atag->hdr.tag == ATAG_CMDLINE) {
+		if (atag->hdr.tag == ATAG_CMDLINE/*=54410009*/) {	// tag구조체에서 9번째 요소가 tag_cmd관련 요소인데 이렇게 하나하나  요소를 hdr.tag를 통해 하나씩 비교한다.
 			/* Append the ATAGS command line to the device tree
 			 * command line.
 			 * NB: This means that if the same parameter is set in
 			 * the device tree and in the tags, the one from the
 			 * tags will be chosen.
 			 */
-			if (do_extend_cmdline)
+			if (do_extend_cmdline)	// 확장한다는 DEFINE이 서있으면 =1.
 				merge_fdt_bootargs(fdt,
 						   atag->u.cmdline.cmdline);
 			else
@@ -161,8 +167,11 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
 			if (!atag->u.mem.size)
 				continue;
 			memsize = get_cell_size(fdt);
-
-			if (memsize == 2) {
+	
+			if (memsize == 2) {	// OS 64bit or 32bit 에 따라 Cell Size가 정해짐
+						// 눈으로 확인하고싶으면
+						// arch/arm/boot/dts/skeleton.dts, skeleton64.dts 를 열어보자.
+						// #size-cells 가 정의되어 있다.
 				/* if memsize is 2, that means that
 				 * each data needs 2 cells of 32 bits,
 				 * so the data are 64 bits */
@@ -191,9 +200,18 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
 	}
 
 	if (memcount) {
+		// fdt를 open한 메모리에 memcpy를 한다.
+		// 그러면 지금까지의 atag정보들이 fdt쭉 들어간다.
 		setprop(fdt, "/memory", "reg", mem_reg_property,
-			4 * memcount * memsize);
+			4 * memcount/*=16*/ * memsize/*=1or2*/);
 	}
 
 	return fdt_pack(fdt);
 }
+/*
+   2015. 09. 05. (토) 21:25:32 KST
+   Name : DH Kim
+   End Driving ...
+*/
+
+

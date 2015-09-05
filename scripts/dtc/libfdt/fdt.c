@@ -57,16 +57,17 @@
 
 int fdt_check_header(const void *fdt)
 {
+	// 어쨋든 FDT_MAGIC만 체크.
 	if (fdt_magic(fdt) == FDT_MAGIC) {
 		/* Complete tree */
 		if (fdt_version(fdt) < FDT_FIRST_SUPPORTED_VERSION)
 			return -FDT_ERR_BADVERSION;
 		if (fdt_last_comp_version(fdt) > FDT_LAST_SUPPORTED_VERSION)
 			return -FDT_ERR_BADVERSION;
-	} else if (fdt_magic(fdt) == FDT_SW_MAGIC) {
+	} else if (fdt_magic(fdt) == FDT_SW_MAGIC) {	// FDT_SW_MAGIC는 MAGIC의 not한것.
 		/* Unfinished sequential-write blob */
 		if (fdt_size_dt_struct(fdt) == 0)
-			return -FDT_ERR_BADSTATE;
+			return -FDT_ERR_BADSTATE;	// Func가 통과되지 못했다.ㅠ
 	} else {
 		return -FDT_ERR_BADMAGIC;
 	}
