@@ -536,25 +536,29 @@ restart:	adr	r0, LC0					// LC(location counter)O의 주소를 r0에 저장
    End Driving ...
 */
 
-
+/*
+	2015. 10. 17. (토) 19:30:32 KST
+	Name : sim man seop
+*/		
 		/*
 		 * If returned value is 1, there is no ATAG at the location
 		 * pointed by r8.  Try the typical 0x100 offset from start
 		 * of RAM and hope for the best.
 		 */
-		cmp	r0, #1
-		sub	r0, r4, #TEXT_OFFSET
+		cmp	r0, #1 // atags_to_fdt 함수의 리턴값이 1 이면 atag를 fdt로 변환
+		sub	r0, r4, #TEXT_OFFSET // RAMSTART 영역을 찾기위해 TEXT_OFFSET 
 		bic	r0, r0, #1
 		add	r0, r0, #0x100
 		mov	r1, r6
 		mov	r2, r5
-		bleq	atags_to_fdt
+		bleq	atags_to_fdt // 위에서 호출한 atags_to_fdt 함수가 실패하면 다시 호출
 
-		ldmfd	sp!, {r0-r3, ip, lr}
-		sub	sp, sp, r5
+		ldmfd	sp!, {r0-r3, ip, lr} // atags_to_fdt 함수를 위해 레지스터에 있던 값을 스택에 저장 하였고
+						// 함수호출이 끝나고 다시 필요해져서 스택에 저장했던 값을 원래대로 로드
+		sub	sp, sp, r5 // 스택포인터를 원래대로 정리해줌!
 #endif
 
-		mov	r8, r6			@ use the appended device tree
+		mov	r8, r6			@ use the appended device tree // 커널 마지막 주소(dtb 시작주소)
 
 		/*
 		 * Make sure that the DTB doesn't end up in the final
@@ -679,10 +683,14 @@ wont_overwrite:
  *   r12 = GOT end
  *   sp  = stack pointer
  */
-		orrs	r1, r0, r5
-		beq	not_relocated
+		// delta : 커널 로딩 주소 보정을 위해 사용하는 값.
 
-		add	r11, r11, r0
+		orrs	r1, r0, r5 // 추가된 dtb size가 0이면은 relocate를 할필요가 없고, 추가된 dtb size가 0이 아니면	
+				  // relocate를 해야함, 따라서 or로  delta 만큼 사이즈를 더함 더하려는 비트가 다를때만 
+				  // 덧셈을통해  or 로 align을 맞춰줌 and align 반대
+		beq	not_relocated // 호출 
+
+		add	r11, r11, r0 // delta 값 만큼 GOT table을 보정
 		add	r12, r12, r0
 
 #ifndef CONFIG_ZBOOT_ROM

@@ -27,7 +27,7 @@ struct tag_header {
 };
 
 /* The list must start with an ATAG_CORE node */
-#define ATAG_CORE	0x54410001
+#define ATAG_CORE	0x54410001 // atag node 시작 주소 
 
 struct tag_core {
 	__u32 flags;		/* bit 0 = read-only */
@@ -77,7 +77,7 @@ struct tag_ramdisk {
 /* describes where the compressed ramdisk image lives (physical address) */
 #define ATAG_INITRD2	0x54420005
 
-struct tag_initrd {
+struct tag_initrd { // ramdisk
 	__u32 start;	/* physical start address */
 	__u32 size;	/* size of compressed ramdisk image in bytes */
 };
@@ -93,7 +93,7 @@ struct tag_serialnr {
 /* board revision */
 #define ATAG_REVISION	0x54410007
 
-struct tag_revision {
+struct tag_revision { 
 	__u32 rev;
 };
 
@@ -102,7 +102,11 @@ struct tag_revision {
  */
 #define ATAG_VIDEOLFB	0x54410008
 
-struct tag_videolfb {
+struct tag_videolfb { // 화면을 framebuffer를 통해 출력(방식이 달라서 videotext, videolfb)
+                      // lcd 사용시 framebuffer(videolfb) 사용, DVI Cable, CRT 사용시 videotext사용으로 추정.
+                      // framebuffer : pixel 방식, videotext : 라인주사 방식
+                      // framebuffer 는 포팅에 용이함.
+                      // 이유 : 하드웨어가 달라서?  
 	__u16		lfb_width;
 	__u16		lfb_height;
 	__u16		lfb_depth;
@@ -122,13 +126,13 @@ struct tag_videolfb {
 /* command line: \0 terminated string */
 #define ATAG_CMDLINE	0x54410009
 
-struct tag_cmdline {
+struct tag_cmdline { // struct hack trick use(zero size array)
 	char	cmdline[1];	/* this is the minimum size */
 };
 
 /* acorn RiscPC specific information */
 #define ATAG_ACORN	0x41000101
-
+// 주변장치 관련 atag
 struct tag_acorn {
 	__u32 memc_control_reg;
 	__u32 vram_pages;
@@ -138,7 +142,7 @@ struct tag_acorn {
 
 /* footbridge memory clock, see arch/arm/mach-footbridge/arch.c */
 #define ATAG_MEMCLK	0x41000402
-
+// 메모리 클럭 관련 부분
 struct tag_memclk {
 	__u32 fmemclk;
 };
@@ -170,7 +174,7 @@ struct tag {
 
 struct tagtable {
 	__u32 tag;
-	int (*parse)(const struct tag *);
+	int (*parse)(const struct tag *); // ???
 };
 
 #define tag_member_present(tag,member)				\
