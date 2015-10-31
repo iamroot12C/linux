@@ -131,7 +131,7 @@ unsigned long __stack_chk_guard;
 
 void __stack_chk_guard_setup(void)
 {
-	__stack_chk_guard = 0x000a0dff;
+	__stack_chk_guard = 0x000a0dff; // stack 가드 : stack 메모리 침범 방어
 }
 
 void __stack_chk_fail(void)
@@ -145,7 +145,8 @@ extern int do_decompress(u8 *input, int len, u8 *output, void (*error)(char *x))
 void
 decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
 		unsigned long free_mem_ptr_end_p,
-		int arch_id)
+		int arch_id)   
+    /*r0(r4=kernel실행주소 , r1(sp), r2(malloc end ptr), r3(architecture ID) */
 {
 	int ret;
 
@@ -156,7 +157,7 @@ decompress_kernel(unsigned long output_start, unsigned long free_mem_ptr_p,
 	free_mem_end_ptr	= free_mem_ptr_end_p;
 	__machine_arch_type	= arch_id;
 
-	arch_decomp_setup();
+	arch_decomp_setup(); // UART setup
 
 	putstr("Uncompressing Linux...");
 	ret = do_decompress(input_data, input_data_end - input_data,

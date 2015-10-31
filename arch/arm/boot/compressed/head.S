@@ -461,7 +461,7 @@ restart:	adr	r0, LC0					// LC(location counter)O의 주소를 r0에 저장
 #ifndef __ARMEB__ // endian big
 		ldr	r1, =0xedfe0dd0		@ sig is 0xd00dfeed big endian
 #else
-		ldr	r1, =0xd00dfeed         // dtb의 magic number??
+		ldr	r1, =0xd00dfeed         // dtb의 size. 15518 -> 15520(allign)  
 #endif
 		cmp	lr, r1                  // if (lr - r1 < 0) -> not equal
 		bne	dtb_check_done		@ not found // lr < r1 이면 not found
@@ -591,6 +591,14 @@ restart:	adr	r0, LC0					// LC(location counter)O의 주소를 r0에 저장
 		add	r10, r10, r5
 		add	sp, sp, r5
 dtb_check_done:
+/*
+ *	2015. 10. 31. (토) 15:01:03 KST
+ *	Source Driving presenter : Dongho Kim
+ * 	Driving count : ? 
+ *
+ * 	Start Driving ...
+ */
+
 #endif
 // dtb 로 개발하지 않을때..
 /*
@@ -603,13 +611,13 @@ dtb_check_done:
  *   r4 + image length <= address of wont_overwrite -> OK
  * Note: the possible LSB in r4 is harmless here.
  */
-		add	r10, r10, #16384
-		cmp	r4, r10
-		bhs	wont_overwrite
-		add	r10, r4, r9
-		adr	r9, wont_overwrite
-		cmp	r10, r9
-		bls	wont_overwrite
+		add	r10, r10, #16384 //16384==16K :: r10 = r10 + 16K
+		cmp	r4, r10 	 // r4 - (r10 +16K) >= 0 --> r4 - 16K >= r10 
+		bhs	wont_overwrite	 // bhs --> (-)해서 양수가 나오면 분기, relocation안해도 된다
+		add	r10, r4, r9	 // r10 = r4 + r9
+		adr	r9, wont_overwrite // r9 <- wont_overite(address pointer value)
+		cmp	r10, r9		   // r10 - r9  
+		bls	wont_overwrite	   // r10 - r9 >= 0 분기
 
 /*
  * Relocate ourselves past the end of the decompressed kernel.
@@ -684,14 +692,18 @@ wont_overwrite:
  *   sp  = stack pointer
  */
 		// delta : 커널 로딩 주소 보정을 위해 사용하는 값.
-
+		// delta 설명 (380 line)	    
+		// r0에는 현재 실행 중인 LC0의 주소 값, r1에는 링크 시에 지정된 LC0의 주소 값이
+		// 담겨있다relocation으로 인해 r0의 값이 변경될 수 있기 때문에 delta offset을
+		// 계산해서 보정함. -> 시작 offset 설정
+	
 		orrs	r1, r0, r5 // 추가된 dtb size가 0이면은 relocate를 할필요가 없고, 추가된 dtb size가 0이 아니면	
 				  // relocate를 해야함, 따라서 or로  delta 만큼 사이즈를 더함 더하려는 비트가 다를때만 
 				  // 덧셈을통해  or 로 align을 맞춰줌 and align 반대
 		beq	not_relocated // 호출 
 
-		add	r11, r11, r0 // delta 값 만큼 GOT table을 보정
-		add	r12, r12, r0
+		add	r11, r11, r0 // delta 값 만큼 GOT table을 보정 GOT(Global Offset Table) : shared library를 위한 섹션
+		add	r12, r12, r0 
 
 #ifndef CONFIG_ZBOOT_ROM
 		/*
@@ -699,21 +711,26 @@ wont_overwrite:
 		 * we need to fix up pointers into the BSS region.
 		 * Note that the stack pointer has already been fixed up.
 		 */
-		add	r2, r2, r0
+		add	r2, r2, r0	// BSS start + Delta
 		add	r3, r3, r0
 
 		/*
 		 * Relocate all entries in the GOT table.
 		 * Bump bss entries to _edata + dtb size
 		 */
-1:		ldr	r1, [r11, #0]		@ relocate entries in the GOT
+1:		ldr	r1, [r11, #0]		@ relocate entries in the GOT // r1 <- r11의 0번지의 값
+						// 밑에 C언어 참조(Loop 문)
 		add	r1, r1, r0		@ This fixes up C references
 		cmp	r1, r2			@ if entry >= bss_start &&
-		cmphs	r3, r1			@       bss_end > entry
-		addhi	r1, r1, r5		@    entry += dtb size
-		str	r1, [r11], #4		@ next entry
-		cmp	r11, r12
-		blo	1b
+		cmphs	r3, r1			@       bss_end > entry		
+		addhi	r1, r1, r5		@    entry += dtb size 		
+		str	r1, [r11], #4		@ next entry //4byte allign
+		cmp	r11, r12		// r11 - r12 >= 0 loop end
+		blo	1b			// r11 - r12 < 0 loop
+		
+		/* loop를 통해 got의 엔트리 값들을 delta offset과 dtb size만큼 재배치 해준다. 
+		/* got 엔트리 값들은 bss_start와 bss_entry 사이의 값 
+		 */
 
 		/* bump our bss pointers too */
 		add	r2, r2, r5
@@ -734,22 +751,27 @@ wont_overwrite:
 		blo	1b
 #endif
 
-not_relocated:	mov	r0, #0
-1:		str	r0, [r2], #4		@ clear bss
-		str	r0, [r2], #4
-		str	r0, [r2], #4
-		str	r0, [r2], #4
-		cmp	r2, r3
-		blo	1b
+not_relocated:	mov	r0, #0			// delta 0초기화
+1:		str	r0, [r2], #4		@ clear bss // r2[0+i] = r0
+		str	r0, [r2], #4			    // r2[1+i] = r0
+		str	r0, [r2], #4			    // r2[2+i] = r0
+		str	r0, [r2], #4			    // r2[3+i] = r0
+		cmp	r2, r3			// r2 - r3 >= 0 loop end(r2=bss_start, r3=bss_end)
+		blo	1b			// r2 - r3 < 0 loop
 
 		/*
 		 * Did we skip the cache setup earlier?
 		 * That is indicated by the LSB in r4.
 		 * Do it now if so.
 		 */
-		tst	r4, #1
-		bic	r4, r4, #1
-		blne	cache_on
+		tst	r4, #1			// r4 & 1 (336라인에서 cache 설정 할지 안할지 결정을 함.(기본적으로 1로 셋팅))
+		bic	r4, r4, #1		// bit clear(LSB : 0) 
+		/* TODO : blne에 대한점을 다시 토의!!. 
+		 *        분석대로면 cache_on을 타야되지만,
+		 *	  코드상 cache_on을 안타는거 같다. 
+		 *	  다시 한번 봅시다!
+		 */
+		blne	cache_on		// cache_on 분기 
 
 /*
  * The C runtime environment should now be setup sufficiently.
@@ -758,9 +780,18 @@ not_relocated:	mov	r0, #0
  *   r7  = architecture ID
  *   r8  = atags pointer
  */
+/*
+ *	2015. 10. 31. (토) 20:33:22 KST
+ *	Source Driving presenter : Dongho Kim
+ * 	Driving count : ? 
+ *
+ * 	End Driving ...
+ *	decompress_kernel 입구까지 봄
+ */
+
 		mov	r0, r4
 		mov	r1, sp			@ malloc space above stack
-		add	r2, sp, #0x10000	@ 64k max
+		add	r2, sp, #0x10000	@ 64k max  // r2에 malloc_size넣어줌
 		mov	r3, r7
 		bl	decompress_kernel
 		bl	cache_clean_flush
@@ -926,9 +957,6 @@ __setup_mmu:	sub	r3, r4, #16384		@ Page directory size 16KB임.
 						//천만번지(256MB)를 R9에 더해서 R10으로.
 
 						//8000번지 위에 있는 페이지테이블을 생성하는중..
-=========================== 
-2015. 07. 25. (토) 21:35:30 KST
-===========================
 
 		mov	r1, #0x12		@ XN|U + section mapping
 		orr	r1, r1, #3 << 10	@ AP=11
