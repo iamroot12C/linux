@@ -448,6 +448,7 @@ restart:	adr	r0, LC0					// LC(location counter)O의 주소를 r0에 저장
  *   r7  = architecture ID
  *   r8  = atags/device tree pointer
  *   r9  = size of decompressed image
+										     // bit 0~2 : line size,bit 3~12 : associative bit,13~27 : number of sets
  *   r10 = end of this image, including  bss/stack/malloc space if non XIP
  *   r11 = GOT start // GOT: Shared library 를 위한 section
  *   r12 = GOT end
@@ -788,14 +789,27 @@ not_relocated:	mov	r0, #0			// delta 0초기화
  * 	End Driving ...
  *	decompress_kernel 입구까지 봄
  */
+/*
 
+	2015. 11. 07. (토) 15:09:54 KST
+	Driving Start : Shim man seop
+
+*/
 		mov	r0, r4
 		mov	r1, sp			@ malloc space above stack
 		add	r2, sp, #0x10000	@ 64k max  // r2에 malloc_size넣어줌
 		mov	r3, r7
 		bl	decompress_kernel
-		bl	cache_clean_flush
-		bl	cache_off
+		bl	cache_clean_flush 	//	beq (branch equal 일때는, lr(link register)에 복귀주소를 저장하지 않음!
+
+
+
+//	2015. 11. 07. (토) 21:01:07 KST
+//	Driving End : Shim man seop 
+//
+
+
+		bl	cache_off 
 		mov	r1, r7			@ restore architecture number
 		mov	r2, r8			@ restore atags pointer
 
@@ -1419,63 +1433,84 @@ __armv6_mmu_cache_flush:
 __armv7_mmu_cache_flush:
 		tst	r4, #1
 		bne	iflush
-		mrc	p15, 0, r10, c0, c1, 5	@ read ID_MMFR1
+		mrc	p15, 0, r10, c0, c1, 5	@ read ID_MMFR1 // 다단 캐시인지 여부 확인(ID_MMFR1 : 캐시 종류)
 		tst	r10, #0xf << 16		@ hierarchical cache (ARMv7)
 		mov	r10, #0
 		beq	hierarchical
-		mcr	p15, 0, r10, c7, c14, 0	@ clean+invalidate D
-		b	iflush
-hierarchical:
-		mcr	p15, 0, r10, c7, c10, 5	@ DMB
+		mcr	p15, 0, r10, c7, c14, 0	@ clean+invalidate D // D-cache 클린
+		b	iflush 
+hierarchical: // hierarchical을 타면 쭉 실행 되고, 아니면, mcr(D-cache클린 : 1431line)을 실행한뒤 iflush 실행.
+		mcr	p15, 0, r10, c7, c10, 5	@ DMB // 메모리 장벽 역할을 하는 데이터 메모리 장벽. 
+						      // 프로그램 순서에서 DMB 명령어 앞에 있는 모든 명시적 메모리 액세스가 DMB 명령어 뒤에 있는 명시적 메모리 액세스보다 
+						      //앞에 표시되도록 함. 이때 프로세서에서 실행 중인 다른 명령어의 순서에는 영향을 주지 않음.
+						     // c10의 5번 연산 : data memory barrier, c7 : sub register
 		stmfd	sp!, {r0-r7, r9-r11}
-		mrc	p15, 1, r0, c0, c0, 1	@ read clidr
-		ands	r3, r0, #0x7000000	@ extract loc from clidr
-		mov	r3, r3, lsr #23		@ left align loc bit field
-		beq	finished		@ if loc is 0, then no need to clean
-		mov	r10, #0			@ start clean at cache level 0
-loop1:
-		add	r2, r10, r10, lsr #1	@ work out 3x current cache level
-		mov	r1, r0, lsr r2		@ extract cache type bits from clidr
-		and	r1, r1, #7		@ mask of the bits for current cache only
-		cmp	r1, #2			@ see what cache we have at this level
-		blt	skip			@ skip if no cache, or just i-cache
-		mcr	p15, 2, r10, c0, c0, 0	@ select current cache level in cssr
-		mcr	p15, 0, r10, c7, c5, 4	@ isb to sych the new cssr&csidr
-		mrc	p15, 1, r1, c0, c0, 0	@ read the new csidr
-		and	r2, r1, #7		@ extract the length of the cache lines
-		add	r2, r2, #4		@ add 4 (line length offset)
-		ldr	r4, =0x3ff
-		ands	r4, r4, r1, lsr #3	@ find maximum number on the way size
-		clz	r5, r4			@ find bit position of way size increment
-		ldr	r7, =0x7fff
-		ands	r7, r7, r1, lsr #13	@ extract max number of the index size
+		mrc	p15, 1, r0, c0, c0, 1	@ read clidr // (Cache LEVEL ID Register) I-Cache 인지 D-Cache 인지 판정.
+		ands	r3, r0, #0x7000000	@ extract loc from clidr // Cache LEVEL ID의 24~27bit 검사, LEVEL of Cohorency : 메모리의 값이랑 캐시의 값과 동기화를 시키는것.(일관성)
+		mov	r3, r3, lsr #23		@ left align loc bit field // 상위비트 -> 하위비트, Cache LEVEL ID를 24~27에서 -> 1~4 bit로 이동 시킴
+									   // cache_level 이 LOC에 저장
+									   // lxx shift, rxx shift 차이 : shift시 0으로 채우냐, 부호에따라 따로 처리해주냐 차이임!
+		beq	finished		@ if loc is 0, then no need to clean // loc==0 이면 캐시 일관성을 맞출필요가 없으니, finished로 넘어감.
+										     // loc==1 이면 캐시 일관성을 맞추어주어야 함.
+		mov	r10, #0			@ start clean at cache level 0 // 일단 level0 캐시 부터 비우기 시작!,r10 = cache level ?
+loop1: // loop의 의미 : 루프를 돌면서, 각 cache level 에 대한, 정책, 정보 등을 채워줌.
+		add	r2, r10, r10, lsr #1	@ work out 3x current cache level // cache bit를 3bit씩 증가시킴 (0,3,6,...) r10 + 0.5*r10 = 1.5*r10,r10 -> 0,2,4,6,... 증가
+		mov	r1, r0, lsr r2		@ extract cache type bits from clidr // r1 = r0 >> r2, 처음에는 r1,r2 = 0,r0 = Cache LEVEL ID 24~27bit를 가져옴, 3bit씩 alignment 되서
+										     // 1.5*r10*2n = 3n*r10
+		and	r1, r1, #7		@ mask of the bits for current cache only // 하위3bit를 masking
+		cmp	r1, #2			@ see what cache we have at this level // 3bit씩 늘리는 이유 : CLIDR bit assignments 검사하기 위해서!
+											// 2번째 bit가 D-Cache 1번째 bit가 I-Cache, 여기서는 D-Cache(2번째 bit)를 확인!
+		blt	skip			@ skip if no cache, or just i-cache  // 0이면 skip으로 이동(No Cache 이거나, I-Cache 만 존재할시에),
+										     // 여기부터 skip label 전까지의 루틴은 D-Cache 처리 작업.
+										     // skip하는 이유 : 캐시 데이터 일관성을 위해서 D-Cache 부터 flush를 해줌!
+		mcr	p15, 2, r10, c0, c0, 0	@ select current cache level in cssr // cache size selection -> cache level 을 담고 있음
+										     // CSSELR vs CSSR : 단지, 호칭의 차이임(같은것)
+										     // CSSELR[1:3]bit = cache level
+										     // bit 0 : I-cache or D-cache,bit 1~3 : level,bit 4~ : reserved area
+		mcr	p15, 0, r10, c7, c5, 4	@ isb to sych the new cssr&csidr // isb 의 의미 : pipeline의 동기화를 맞추기위해 명령어 lock,
+										 // c7 레지스터의 의미 : 캐시 정책, cache level이 0~7까지 있음
+									         // c7[1:3]bit = cache level, 1bit부터 3bit 까지 쓰기위해(0bit를 사용하지 않기 위해)
+										 // 2씩 더해서, 루프를 돌며 캐시를 지정,(따라서 shift를 사용하지 않아도 됨)
+
+		mrc	p15, 1, r1, c0, c0, 0	@ read the new csidr		 // csidr : cache size id register, csidr에서 : 실제 캐시 정보
+										 //(캐시 라인 크기, Associative set 개수, 캐시 정책 등)이 들어있음. 
+										 //Complete register encoding 값으로, 어떻게 캐시를 setting해야하는지를 알려줌
+										 //(또는 어떤 캐시인지도 알수 있음).
+		and	r2, r1, #7		@ extract the length of the cache lines // csdir[0:2]bit = line size = r2
+		add	r2, r2, #4		@ add 4 (line length offset) // cache level 계산할때, TODO : 왜 4씩 더해서 하는가? 
+		ldr	r4, =0x3ff // =을 사용하여 ldr 대입 명령을 사용하면 immediate값(상수 값)을 넣을 수 있음, 0x3ff-> 하위 10 bit,associativity size 가져옴. 
+		ands	r4, r4, r1, lsr #3	@ find maximum number on the way size, asscociativity==way size
+		clz	r5, r4			@ find bit position of way size increment // clz r5, r4는 r4에 31비트부터 처음으로 1이 나오는 비트의 번째수를 구하											    // 는 겁니다. (또는 1이 나오기 전까지의 0의 개수)
+		ldr	r7, =0x7fff // 하위 15bit -> numset Size
+		ands	r7, r7, r1, lsr #13	@ extract max number of the index size // numset size(15bit) 가져오기
 loop2:
-		mov	r9, r4			@ create working copy of max way size
+		mov	r9, r4			@ create working copy of max way size // r4 = way size,r9 = way size
 loop3:
- ARM(		orr	r11, r10, r9, lsl r5	) @ factor way and cache number into r11
- ARM(		orr	r11, r11, r7, lsl r2	) @ factor index number into r11
+ ARM(		orr	r11, r10, r9, lsl r5	) @ factor way and cache number into r11 // way를 자리잡기위해 실행하는 명령어
+ ARM(		orr	r11, r11, r7, lsl r2	) @ factor index number into r11 // r2(4 만큼) 시프트.
  THUMB(		lsl	r6, r9, r5		)
  THUMB(		orr	r11, r10, r6		) @ factor way and cache number into r11
  THUMB(		lsl	r6, r7, r2		)
  THUMB(		orr	r11, r11, r6		) @ factor index number into r11
-		mcr	p15, 0, r11, c7, c14, 2	@ clean & invalidate by set/way
-		subs	r9, r9, #1		@ decrement the way
+		mcr	p15, 0, r11, c7, c14, 2	@ clean & invalidate by set/way // cache way,set,level등의 정보가 담긴 maintanance cache
+		subs	r9, r9, #1		@ decrement the way // way 1개씩 아직 채워지지 않은 way부터 비교
 		bge	loop3
-		subs	r7, r7, #1		@ decrement the index
+		subs	r7, r7, #1		@ decrement the index // way를 다 처리한뒤 index 1개씩 감소
 		bge	loop2
 skip:
-		add	r10, r10, #2		@ increment cache number
+		add	r10, r10, #2		@ increment cache number // 여기서 2증가 해서 결과적으로 3배가 됨
 		cmp	r3, r10
-		bgt	loop1
+		bgt	loop1	// 3중 루프 (loop3 -> way,loop2 -> index,loop1 -> cache number == cache_level)
+				// setting 순서, line,way,index,cache level
 finished:
-		ldmfd	sp!, {r0-r7, r9-r11}
-		mov	r10, #0			@ swith back to cache level 0
-		mcr	p15, 2, r10, c0, c0, 0	@ select current cache level in cssr
-iflush:
-		mcr	p15, 0, r10, c7, c10, 4	@ DSB
-		mcr	p15, 0, r10, c7, c5, 0	@ invalidate I+BTB
-		mcr	p15, 0, r10, c7, c10, 4	@ DSB
-		mcr	p15, 0, r10, c7, c5, 4	@ ISB
+		ldmfd	sp!, {r0-r7, r9-r11} // pop명령어와 동일
+		mov	r10, #0			@ swith back to cache level 0 // cache level 0로 복구
+		mcr	p15, 2, r10, c0, c0, 0	@ select current cache level in cssr // 다시 원래 cache level로 복구
+iflush: // mainanance cache로 i-cache 정보와 BTB 전송
+		mcr	p15, 0, r10, c7, c10, 4	@ DSB // 데이터 동기화 명령어
+		mcr	p15, 0, r10, c7, c5, 0	@ invalidate I+BTB // pipeline 깨짐을 방지하기위해, I-Cache 와 Branch target buffer를 처리.
+		mcr	p15, 0, r10, c7, c10, 4	@ DSB // 데이터 동기화 명령어
+		mcr	p15, 0, r10, c7, c5, 4	@ ISB // 명령어 동기화 명령어
 		mov	pc, lr
 
 __armv5tej_mmu_cache_flush:
