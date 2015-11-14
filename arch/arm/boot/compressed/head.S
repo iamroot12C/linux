@@ -802,13 +802,16 @@ not_relocated:	mov	r0, #0			// delta 0초기화
 		bl	decompress_kernel
 		bl	cache_clean_flush 	//	beq (branch equal 일때는, lr(link register)에 복귀주소를 저장하지 않음!
 
-
-
 //	2015. 11. 07. (토) 21:01:07 KST
 //	Driving End : Shim man seop 
 //
-
-
+/*
+ *	2015. 11. 14. (토) 14:38:04 KST
+ *	Source Driving presenter : Dongho Kim
+ * 	Driving count : ? 
+ *
+ * 	Start Driving ...
+ */
 		bl	cache_off 
 		mov	r1, r7			@ restore architecture number
 		mov	r2, r8			@ restore atags pointer
@@ -1120,10 +1123,15 @@ __common_mmu_cache_on:
  *  r12 = corrupted
  */
 
+		/* call_cache_fn 진입전에 cache관련 함수 진입
+		 * cache_on : r3 = 8 (01000)
+		 * cache_off : r3 = 12 (01100)
+		 * cache_clean_flush : r3 = 16 (10000)
+		 */
 call_cache_fn:	adr	r12, proc_types  //proc_types 의 주소를 r12에 저장한 후
 #ifdef CONFIG_CPU_CP15	//CP15가 설정되어있으면
 		mrc	p15, 0, r9, c0, c0	@ get processor ID
-			//R9에 MPIDR 레지스터에 있는 값을 저장한다.
+			//R9에 MIDR 레지스터에 있는 값을 저장한다.
 
 #elif defined(CONFIG_CPU_V7M)//만약 V7M이 정의되어있다면
 		/*
@@ -1328,8 +1336,15 @@ proc_types:
  * This routine must preserve:
  *  r4, r7, r8
  */
-		.align	5
-cache_off:	mov	r3, #12			@ cache_off function
+		/*   r0, r1, r2, r3, r9, r12 변수로 사용 
+		 *   r4  = kernel execution address
+		 *   r7  = architecture ID
+		 *   r8  = atags pointer
+		 */
+		.align	5			// instruction cache = 2^5 = 32Byte로 정렬 
+						// align은 padding 맞춰주기 위해 사용
+						// ex) cache는 32byte로 전송되므로
+cache_off:	mov	r3, #12			@ cache_off function, 12 = 1100
 		b	call_cache_fn
 
 __armv4_mpu_cache_off:
@@ -1362,16 +1377,16 @@ __armv4_mmu_cache_off:
 		mov	pc, lr
 
 __armv7_mmu_cache_off:
-		mrc	p15, 0, r0, c1, c0
+		mrc	p15, 0, r0, c1, c0 // r0 <- System Control Registers
 #ifdef CONFIG_MMU
-		bic	r0, r0, #0x000d
+		bic	r0, r0, #0x000d // 1101 MMU,CACHE bit clear
 #else
-		bic	r0, r0, #0x000c
+		bic	r0, r0, #0x000c // 1100 CACHE bit clear
 #endif
 		mcr	p15, 0, r0, c1, c0	@ turn MMU and cache off
 		mov	r12, lr
 		bl	__armv7_mmu_cache_flush
-		mov	r0, #0
+		mov	r0, #0 // r0(System Control Registers) 초기화
 #ifdef CONFIG_MMU
 		mcr	p15, 0, r0, c8, c7, 0	@ invalidate whole TLB
 #endif
