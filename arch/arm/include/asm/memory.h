@@ -190,7 +190,7 @@ extern const void *__pv_table_begin, *__pv_table_end;
 #define virt_to_pfn(kaddr) \
 	((((unsigned long)(kaddr) - PAGE_OFFSET) >> PAGE_SHIFT) + \
 	 PHYS_PFN_OFFSET)
-
+//TODO :: 아직 안함 나중에 와야됨
 #define __pv_stub(from,to,instr,type)			\
 	__asm__("@ __pv_stub\n"				\
 	"1:	" instr "	%0, %1, %2\n"		\
@@ -199,6 +199,13 @@ extern const void *__pv_table_begin, *__pv_table_end;
 	"	.popsection\n"				\
 	: "=r" (to)					\
 	: "r" (from), "I" (type))
+	/* @ __pv_stub
+	 * 1: add 'to' 'from' 'type'
+	 * 
+	 *
+	 * (':' == '%') ("=r" == output) %0 == to
+	 * ("r" == register) %1 == from, ("I" == immediate) %2 == type
+	 */
 
 #define __pv_stub_mov_hi(t)				\
 	__asm__ volatile("@ __pv_stub_mov\n"		\
@@ -224,9 +231,9 @@ static inline phys_addr_t __virt_to_phys(unsigned long x)
 {
 	phys_addr_t t;
 
-	if (sizeof(phys_addr_t) == 4) {
+	if (sizeof(phys_addr_t) == 4) { //32bit
 		__pv_stub(x, t, "add", __PV_BITS_31_24);
-	} else {
+	} else {	//64bit
 		__pv_stub_mov_hi(t);
 		__pv_add_carry_stub(x, t);
 	}

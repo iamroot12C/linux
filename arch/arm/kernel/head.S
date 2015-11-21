@@ -14,6 +14,13 @@
 #include <linux/linkage.h>
 #include <linux/init.h>
 
+/* 2015. 11. 21. (토) 14:28:43 KST
+ * Source Driving presenter : Dongho Kim
+ * 
+ * Start Driving ...
+ *
+ */
+
 #include <asm/assembler.h>
 #include <asm/cp15.h>
 #include <asm/domain.h>
@@ -34,12 +41,24 @@
  * the least significant 16 bits to be 0x8000, but we could probably
  * relax this restriction to KERNEL_RAM_VADDR >= PAGE_OFFSET + 0x4000.
  */
-#define KERNEL_RAM_VADDR	(PAGE_OFFSET + TEXT_OFFSET)
-#if (KERNEL_RAM_VADDR & 0xffff) != 0x8000
+/* PAGE_OFFSET은 Kconfig에 정의 
+   : config PAGE_OFFSET 가상메모리에서의 커널의 시작주소
+	hex
+	default PHYS_OFFSET if !MMU
+	default 0x40000000 if VMSPLIT_1G
+	default 0x80000000 if VMSPLIT_2G
+	default 0xC0000000
+   TEXT_OFFSET은 Makefile에 정의 커널의 엔트리 포인트
+	TEXT_OFFSET := $(textofs-y)
+	textofs-y	:= 0x00008000 (32K)
+ */
+
+#define KERNEL_RAM_VADDR	(PAGE_OFFSET + TEXT_OFFSET) // 3G + 32K 
+#if (KERNEL_RAM_VADDR & 0xffff) != 0x8000 // TEXT_OFFSET(32K) 확인
 #error KERNEL_RAM_VADDR must start at 0xXXXX8000
 #endif
 
-#ifdef CONFIG_ARM_LPAE
+#ifdef CONFIG_ARM_LPAE // 이 옵션을 통해 size를 키운다 
 	/* LPAE requires an additional page for the PGD */
 #define PG_DIR_SIZE	0x5000
 #define PMD_ORDER	3
@@ -48,10 +67,10 @@
 #define PMD_ORDER	2
 #endif
 
-	.globl	swapper_pg_dir
+	.globl	swapper_pg_dir // 전역변수 선언
 	.equ	swapper_pg_dir, KERNEL_RAM_VADDR - PG_DIR_SIZE
 
-	.macro	pgtbl, rd, phys
+	.macro	pgtbl, rd, phys // 함수 선언 page table 주소를 가져오는 함수
 	add	\rd, \phys, #TEXT_OFFSET
 	sub	\rd, \rd, #PG_DIR_SIZE
 	.endm
@@ -88,26 +107,28 @@ ENTRY(stext)
 #ifdef CONFIG_ARM_VIRT_EXT
 	bl	__hyp_stub_install
 #endif
-	@ ensure svc mode and all interrupts masked
-	safe_svcmode_maskall r9
+	@ ensure svc mode and all interrupts masked	//supervisor mode and 인터럽트 비활성화
+	safe_svcmode_maskall r9				// r9를 svcnmode maskall  
 
-	mrc	p15, 0, r9, c0, c0		@ get processor id
+	mrc	p15, 0, r9, c0, c0		@ get processor id	//r9 = processor id
 	bl	__lookup_processor_type		@ r5=procinfo r9=cpuid
-	movs	r10, r5				@ invalid processor (r5=0)?
+	movs	r10, r5				@ invalid processor (r5=0)? //move결과에 따라 N,Z flag
  THUMB( it	eq )		@ force fixup-able long branch encoding
-	beq	__error_p			@ yes, error 'p'
+	beq	__error_p			@ yes, error 'p'	// r5 == 0 이면 error
 
 #ifdef CONFIG_ARM_LPAE
 	mrc	p15, 0, r3, c0, c1, 4		@ read ID_MMFR0
-	and	r3, r3, #0xf			@ extract VMSA support
+	and	r3, r3, #0xf			@ extract VMSA support 
+	// VMSA(Virtual Memory System Architecture)
 	cmp	r3, #5				@ long-descriptor translation table format?
+	// cmp r3 0101
  THUMB( it	lo )				@ force fixup-able long branch encoding
 	blo	__error_lpae			@ only classic page table format
 #endif
 
 #ifndef CONFIG_XIP_KERNEL
-	adr	r3, 2f
-	ldmia	r3, {r4, r8}
+	adr	r3, 2f		// r3 == 2f의 물리주소
+	ldmia	r3, {r4, r8}	// r4(2f위치 가상주소), r8(PAGE_OFFSET) 
 	sub	r4, r3, r4			@ (PHYS_OFFSET - PAGE_OFFSET)
 	add	r8, r8, r4			@ PHYS_OFFSET
 #else
@@ -118,7 +139,14 @@ ENTRY(stext)
 	 * r1 = machine no, r2 = atags or dtb,
 	 * r8 = phys_offset, r9 = cpuid, r10 = procinfo
 	 */
-	bl	__vet_atags
+	bl	__vet_atags		// atag 유효성 검사 compressd/head.S atags_to_fdt 함수와 비슷
+
+
+	/* 2015. 11. 21. (토) 20:43:11 KST
+	 * end driving 
+	 * Dongho kim
+	 */
+
 #ifdef CONFIG_SMP_ON_UP
 	bl	__fixup_smp
 #endif

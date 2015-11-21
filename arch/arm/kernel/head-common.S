@@ -45,10 +45,10 @@
  *  r5, r6 corrupted
  */
 __vet_atags:
-	tst	r2, #0x3			@ aligned?
+	tst	r2, #0x3			@ aligned? // 4byte 단위 aligned
 	bne	1f
 
-	ldr	r5, [r2, #0]
+	ldr	r5, [r2, #0]			// r5 = r2의 첫번째 주소(atag size)
 #ifdef CONFIG_OF_FLATTREE
 	ldr	r6, =OF_DT_MAGIC		@ is it a DTB?
 	cmp	r5, r6
@@ -57,10 +57,17 @@ __vet_atags:
 	cmp	r5, #ATAG_CORE_SIZE		@ is first tag ATAG_CORE?
 	cmpne	r5, #ATAG_CORE_SIZE_EMPTY
 	bne	1f
-	ldr	r5, [r2, #4]
-	ldr	r6, =ATAG_CORE
-	cmp	r5, r6
+		ldr	r5, [r2, #4]			// r5 = r2의 두번째 필드(atag tag)
+	ldr	r6, =ATAG_CORE		
+	cmp	r5, r6				// r5 r6 tag 비교
 	bne	1f
+	// 밑에 C언어 구조랑 동일 
+	/*
+	   if (atag->hdr.tag != ATAG_CORE ||               
+	  	(atag->hdr.size != tag_size(tag_core) &&    	
+	  		atag->hdr.size != 2))
+		return 1;
+	 */
 
 2:	ret	lr				@ atag/dtb pointer is ok
 
@@ -150,18 +157,19 @@ ENDPROC(lookup_processor_type)
  *	r9 = cpuid (preserved)
  */
 __lookup_processor_type:
-	adr	r3, __lookup_processor_type_data
-	ldmia	r3, {r4 - r6}
+	adr	r3, __lookup_processor_type_data	//r3 = processor type 정보의 주소	
+	ldmia	r3, {r4 - r6}				
+	//r3(physical start addr) r4(virtual start addr), r5(begin addr), r6(end addr)
 	sub	r3, r3, r4			@ get offset between virt&phys
-	add	r5, r5, r3			@ convert virt addresses to
-	add	r6, r6, r3			@ physical address space
-1:	ldmia	r5, {r3, r4}			@ value, mask
-	and	r4, r4, r9			@ mask wanted bits
-	teq	r3, r4
+	add	r5, r5, r3			@ convert virt addresses to pysical address space
+	add	r6, r6, r3			
+1:	ldmia	r5, {r3, r4}			@ value, mask //r3(value) r4(mask)
+	and	r4, r4, r9			@ mask wanted bits // r4 & r9(cpuid) 
+	teq	r3, r4				
 	beq	2f
 	add	r5, r5, #PROC_INFO_SZ		@ sizeof(proc_info_list)
-	cmp	r5, r6
-	blo	1b
+	cmp	r5, r6				
+	blo	1b				// r5 - r6 < 0 ---> 1b
 	mov	r5, #0				@ unknown processor
 2:	ret	lr
 ENDPROC(__lookup_processor_type)
@@ -169,13 +177,41 @@ ENDPROC(__lookup_processor_type)
 /*
  * Look in <asm/procinfo.h> for information about the __proc_info structure.
  */
+    /* <asm/procinfo.h>에서 가져옴
+    /*
+     * Note!  struct processor is always defined if we're
+     * using MULTI_CPU, otherwise this entry is unused,
+     * but still exists.
+     *
+     * NOTE! The following structure is defined by assembly
+     * language, NOT C code.  For more information, check:
+     *  arch/arm/mm/proc-*.S and arch/arm/kernel/head.S
+     */
+    /*
+       struct proc_info_list {
+       unsigned int		cpu_val;
+       unsigned int		cpu_mask;
+       unsigned long		__cpu_mm_mmu_flags;	
+       unsigned long		__cpu_io_mmu_flags;	
+       unsigned long		__cpu_flush;		
+       const char		*arch_name;
+       const char		*elf_name;
+       unsigned int		elf_hwcap;
+       const char		*cpu_name;
+       struct processor	*proc;
+       struct cpu_tlb_fns	*tlb;
+       struct cpu_user_fns	*user;
+       struct cpu_cache_fns	*cache;
+       };
+     */
 	.align	2
 	.type	__lookup_processor_type_data, %object
 __lookup_processor_type_data:
-	.long	.
-	.long	__proc_info_begin
-	.long	__proc_info_end
-	.size	__lookup_processor_type_data, . - __lookup_processor_type_data
+	.long	.			// '.'은 가상주소
+	.long	__proc_info_begin 	// proc_info_list section 시작
+	.long	__proc_info_end		// proc_info_list section 끝
+	.size	__lookup_processor_type_data, . - __lookup_processor_type_data 
+	//size = 현재주소 - __lookup_processor_type_data 
 
 __error_lpae:
 #ifdef CONFIG_DEBUG_LL
@@ -210,8 +246,8 @@ __error:
  * Turn the screen red on a error - RiscPC only.
  */
 	mov	r0, #0x02000000
-	mov	r3, #0x11
-	orr	r3, r3, r3, lsl #8
+	mov	r3, #0x11		// 00010001
+	orr	r3, r3, r3, lsl #8	 
 	orr	r3, r3, r3, lsl #16
 	str	r3, [r0], #4
 	str	r3, [r0], #4
