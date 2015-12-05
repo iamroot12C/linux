@@ -44,7 +44,7 @@
 /* PAGE_OFFSET은 Kconfig에 정의 
    : config PAGE_OFFSET 가상메모리에서의 커널의 시작주소
 	hex
-	default PHYS_OFFSET if !MMU
+	default PHYS_OFFSET if !MMU 
 	default 0x40000000 if VMSPLIT_1G
 	default 0x80000000 if VMSPLIT_2G
 	default 0xC0000000
@@ -147,11 +147,22 @@ ENTRY(stext)
 	 * Dongho kim
 	 */
 
+	/* 2015. 12. 05. (토) 14:31:34 KST
+	 * Source Driving presenter : Dongho Kim
+	 * 
+	 * Start Driving ...
+	 *
+	 */
+
 #ifdef CONFIG_SMP_ON_UP
-	bl	__fixup_smp
+	bl	__fixup_smp	// SMP(Symmentric Multi Processing)
 #endif
+	/* 2015. 12. 05. (토) 20:47:07 KST
+	 * end driving 
+	 * Dongho kim
+	 */
 #ifdef CONFIG_ARM_PATCH_PHYS_VIRT
-	bl	__fixup_pv_table
+	bl	__fixup_pv_table	// physical to virtual
 #endif
 	bl	__create_page_tables
 
@@ -513,8 +524,8 @@ ENDPROC(__turn_mmu_on)
 	__HEAD
 __fixup_smp:
 	and	r3, r9, #0x000f0000	@ architecture version
-	teq	r3, #0x000f0000		@ CPU ID supported?
-	bne	__fixup_smp_on_up	@ no, assume UP
+	teq	r3, #0x000f0000		@ CPU ID supported? // teq -> xor검사
+	bne	__fixup_smp_on_up	@ no, assume UP // zero flag on -> 함수호출 
 
 	bic	r3, r9, #0x00ff0000
 	bic	r3, r3, #0x0000000f	@ mask 0xff00fff0
@@ -525,8 +536,8 @@ __fixup_smp:
 	reteq	lr			@ yes, assume SMP
 
 	mrc	p15, 0, r0, c0, c0, 5	@ read MPIDR
-	and	r0, r0, #0xc0000000	@ multiprocessing extensions and
-	teq	r0, #0x80000000		@ not part of a uniprocessor system?
+	and	r0, r0, #0xc0000000	@ multiprocessing extensions and 
+	teq	r0, #0x80000000		@ not part of a uniprocessor system? //uniprocess flag
 	bne    __fixup_smp_on_up	@ no, assume UP
 
 	@ Core indicates it is SMP. Check for Aegis SOC where a single
@@ -550,18 +561,18 @@ ARM_BE8(rev	r0, r0)			@ byteswap if big endian
 	retne	lr
 
 __fixup_smp_on_up:
-	adr	r0, 1f
+	adr	r0, 1f		// Memory address 
 	ldmia	r0, {r3 - r5}
-	sub	r3, r0, r3
-	add	r4, r4, r3
+	sub	r3, r0, r3	// 보정검사 r3 = offset
+	add	r4, r4, r3	// offset 검사
 	add	r5, r5, r3
 	b	__do_fixup_smp_on_up
 ENDPROC(__fixup_smp)
 
 	.align
-1:	.word	.
-	.word	__smpalt_begin
-	.word	__smpalt_end
+1:	.word	.		// r3 <- symbol address : mmu on할 경우 가상주소!
+	.word	__smpalt_begin	// r4
+	.word	__smpalt_end	// r5
 
 	.pushsection .data
 	.globl	smp_on_up
@@ -572,9 +583,9 @@ smp_on_up:
 #endif
 
 	.text
-__do_fixup_smp_on_up:
-	cmp	r4, r5
-	reths	lr
+__do_fixup_smp_on_up: // 반복문
+	cmp	r4, r5	// r4(__smpalt_begin), r5(__smpalt_end) [r4 - r5]
+	reths	lr	// hs(unsiged higer or same) return lr;
 	ldmia	r4!, {r0, r6}
  ARM(	str	r6, [r0, r3]	)
  THUMB(	add	r0, r0, r3	)
@@ -613,15 +624,15 @@ ENDPROC(fixup_smp)
  */
 	__HEAD
 __fixup_pv_table:
-	adr	r0, 1f
+	adr	r0, 1f		// r0 <- 1f's address
 	ldmia	r0, {r3-r7}
-	mvn	ip, #0
-	subs	r3, r0, r3	@ PHYS_OFFSET - PAGE_OFFSET
+	mvn	ip, #0		// mov ip, #0xffffffff
+	subs	r3, r0, r3	@ PHYS_OFFSET + (~(PAGE_OFFSET)+1)
 	add	r4, r4, r3	@ adjust table start address
 	add	r5, r5, r3	@ adjust table end address
 	add	r6, r6, r3	@ adjust __pv_phys_pfn_offset address
 	add	r7, r7, r3	@ adjust __pv_offset address
-	mov	r0, r8, lsr #PAGE_SHIFT	@ convert to PFN
+	mov	r0, r8, lsr #PAGE_SHIFT	@ convert to PFN // PAGE_SHIFT 12(4K = 2의 12승), PFN(Page Frame Num) 
 	str	r0, [r6]	@ save computed PHYS_OFFSET to __pv_phys_pfn_offset
 	strcc	ip, [r7, #HIGH_OFFSET]	@ save to __pv_offset high bits
 	mov	r6, r3, lsr #24	@ constant for add/sub instructions
@@ -633,7 +644,7 @@ THUMB(	it	ne		@ cross section branch )
 ENDPROC(__fixup_pv_table)
 
 	.align
-1:	.long	.
+1:	.long	.			 
 	.long	__pv_table_begin
 	.long	__pv_table_end
 2:	.long	__pv_phys_pfn_offset
