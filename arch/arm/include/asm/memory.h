@@ -190,7 +190,6 @@ extern const void *__pv_table_begin, *__pv_table_end;
 #define virt_to_pfn(kaddr) \
 	((((unsigned long)(kaddr) - PAGE_OFFSET) >> PAGE_SHIFT) + \
 	 PHYS_PFN_OFFSET)
-//TODO :: 아직 안함 나중에 와야됨
 #define __pv_stub(from,to,instr,type)			\
 	__asm__("@ __pv_stub\n"				\
 	"1:	" instr "	%0, %1, %2\n"		\

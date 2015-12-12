@@ -162,7 +162,17 @@ ENTRY(stext)
 	 * Dongho kim
 	 */
 #ifdef CONFIG_ARM_PATCH_PHYS_VIRT
+
+	/* 2015. 12. 12. (토) 14:31:08 KST
+	 * Source Driving presenter : DH_Kim
+	 * 
+	 * Start Driving ...
+	 *
+	 */
+	// TODO
+	// __fixup_a_pv_table 부터 재분석 필요.
 	bl	__fixup_pv_table	// physical to virtual
+
 #endif
 	bl	__create_page_tables
 
@@ -622,43 +632,65 @@ ENDPROC(fixup_smp)
  * can be expressed by an immediate shifter operand. The stub instruction
  * has a form of '(add|sub) rd, rn, #imm'.
  */
+/*
+	.align
+1:	.long	.						// r3		 
+	.long	__pv_table_begin		// r4
+	.long	__pv_table_end			// r5
+2:	.long	__pv_phys_pfn_offset	// r6
+	.long	__pv_offset				// r7
+  */
 	__HEAD
 __fixup_pv_table:
 	adr	r0, 1f		// r0 <- 1f's address
 	ldmia	r0, {r3-r7}
 	mvn	ip, #0		// mov ip, #0xffffffff
-	subs	r3, r0, r3	@ PHYS_OFFSET + (~(PAGE_OFFSET)+1)
-	add	r4, r4, r3	@ adjust table start address
-	add	r5, r5, r3	@ adjust table end address
-	add	r6, r6, r3	@ adjust __pv_phys_pfn_offset address
-	add	r7, r7, r3	@ adjust __pv_offset address
+	subs	r3, r0, r3	@ PHYS_OFFSET + (~(PAGE_OFFSET)+1) // r0보다 r3가 더 클 경우 cc : carry clear.
+															// 밑에 strcc 에 영향을 미침.
+	add	r4, r4, r3	@ adjust table start address				// r3의 offset으로 r4 보정
+	add	r5, r5, r3	@ adjust table end address					// r3의 offset으로 r5보정
+	add	r6, r6, r3	@ adjust __pv_phys_pfn_offset address		// r3의 offset으로 r6 보정
+	add	r7, r7, r3	@ adjust __pv_offset address				// r3의 offset으로 r7 보정
 	mov	r0, r8, lsr #PAGE_SHIFT	@ convert to PFN // PAGE_SHIFT 12(4K = 2의 12승), PFN(Page Frame Num) 
+								// r0에 페이지 프레임 개수 들어가 있음.
 	str	r0, [r6]	@ save computed PHYS_OFFSET to __pv_phys_pfn_offset
+								// 페이지 개수를 r6에 들어있는 주소에다가 넣고
 	strcc	ip, [r7, #HIGH_OFFSET]	@ save to __pv_offset high bits
-	mov	r6, r3, lsr #24	@ constant for add/sub instructions
+									// r7의 상위 비트에 ip에 있는 값을 넣는다. r7은 쿼드 이기때문에 8바이트, 즉 상위는 4바이트.
+	mov	r6, r3, lsr #24	@ constant for add/sub instructions	
+						// r3에 있는 값을 오른쪽으로 24비트 쭉 밀고, 민것을 r6에 넣는다. r6에는 하위 8비트만 저장되어 있음.
 	teq	r3, r6, lsl #24 @ must be 16MiB aligned
+						// r6를 다시 왼쪽으로 24비트 밀면, 상위 8비트만 있음. 그거랑 r3랑 비교함. 둘이 같으면 0이 나옴.
+						// teq는 xor연산임.
 THUMB(	it	ne		@ cross section branch )
-	bne	__error
+	bne	__error			// r3 랑 r6랑 일치하지않으면 error로 감. 여기 가면 busy하면서 계속 무한으로 루프돔.
+						// 만약에 r3가 24비트 즉 16메가비트 로 allign안되있으면 error로 간다는 소리.
 	str	r3, [r7, #LOW_OFFSET]	@ save to __pv_offset low bits
+								// 이번에는 r7의 하위 비트에다가 r3 값을 저장.
+								// r7에는 최종적으로 0xFFFFFFFF ??000000
 	b	__fixup_a_pv_table
 ENDPROC(__fixup_pv_table)
 
 	.align
-1:	.long	.			 
-	.long	__pv_table_begin
-	.long	__pv_table_end
-2:	.long	__pv_phys_pfn_offset
-	.long	__pv_offset
+1:	.long	.						// r3		 
+	.long	__pv_table_begin		// r4
+	.long	__pv_table_end			// r5
+2:	.long	__pv_phys_pfn_offset	// r6
+	.long	__pv_offset				// r7
 
 	.text
 __fixup_a_pv_table:
-	adr	r0, 3f
-	ldr	r6, [r0]
-	add	r6, r6, r3
-	ldr	r0, [r6, #HIGH_OFFSET]	@ pv_offset high word
-	ldr	r6, [r6, #LOW_OFFSET]	@ pv_offset low word
-	mov	r6, r6, lsr #24
-	cmn	r0, #1
+	adr	r0, 3f						// 3레이블의 주소값 가져옴
+	ldr	r6, [r0]					// 3레이블에 있는 _pv_offset 레이블의 주소를 r6에 저장
+	add	r6, r6, r3					// r3가 피지컬이랑 페이지의오프셋의 델타값, 즉, r6를 보정해주는 것.
+	ldr	r0, [r6, #HIGH_OFFSET]	@ pv_offset high word	//  r6의 상위 4바이트를 r0 에 저장
+	ldr	r6, [r6, #LOW_OFFSET]	@ pv_offset low word	// r6의 하위 4바이트를 r6에 저장
+	mov	r6, r6, lsr #24				// r6를 오른쪽으로 24비트 밈.
+	cmn	r0, #1						// r0 에 1을 더해서 그에 맞게 상태 플래그가 슴.
+									// r0 에는 0xFFFFFFFF
+									// r6 에는 0x??000000	
+									// 즉, r0=-1 과 1을 더하니까 0이 나오고 Z 플래그 슨다.
+/*
 #ifdef CONFIG_THUMB2_KERNEL
 	moveq	r0, #0x200000	@ set bit 21, mov to mvn instruction
 	lsls	r6, #24
@@ -693,13 +725,28 @@ ARM_BE8(rev16	ip, ip)
 	bcc	1b
 	bx	lr
 #else
-#ifdef CONFIG_CPU_ENDIAN_BE8
+*/
+
+
+
+/*
+	ldr	r0, [r6, #HIGH_OFFSET]	@ pv_offset high word	//  r6의 상위 4바이트를 r0 에 저장
+								// 0xFFFFFFFF
+	ldr	r6, [r6, #LOW_OFFSET]	@ pv_offset low word	// r6의 하위 4바이트를 r6에 저장
+								// 0x??000000
+*/
+#ifdef CONFIG_CPU_ENDIAN_BE8	//
 	moveq	r0, #0x00004000	@ set bit 22, mov to mvn instruction
 #else
+	// Z 플래그가 섰으니까, eq이다. 
 	moveq	r0, #0x400000	@ set bit 22, mov to mvn instruction
 #endif
 	b	2f
-1:	ldr	ip, [r7, r3]
+1:	ldr	ip, [r7, r3]				// r7 즉, instruction의 주소를 delta offset 으로 보정해서 ip 에 넣어줌.
+	/* 2015. 12. 12. (토) 20:48:09 KST
+	 * end driving 
+	 * DH kim
+	 */
 #ifdef CONFIG_CPU_ENDIAN_BE8
 	@ in BE8, we load data in BE, but instructions still in LE
 	bic	ip, ip, #0xff000000
@@ -708,15 +755,31 @@ ARM_BE8(rev16	ip, ip)
 	biceq	ip, ip, #0x00004000 @ clear bit 22
 	orreq	ip, ip, r0      @ mask in offset bits 7-0
 #else
-	bic	ip, ip, #0x000000ff
-	tst	ip, #0xf00	@ check the rotation field
-	orrne	ip, ip, r6	@ mask in offset bits 31-24
+	bic	ip, ip, #0x000000ff								// 0x000000ff의 bitwise not을 한거랑 ip랑 AND연산 해서 ip에 저장,
+														// 즉, ip의 하위 8비트를 클리어 해준겁니다.
+	tst	ip, #0xf00	@ check the rotation field			// 0xf00 = 0x00000f00, rotation field 가 0이면, imedi 필드만 계산하면되지.
+	orrne	ip, ip, r6	@ mask in offset bits 31-24		// rotation field 가 0이 아닐때 들어옴.
 	biceq	ip, ip, #0x400000	@ clear bit 22
 	orreq	ip, ip, r0	@ mask in offset bits 7-0
 #endif
 	str	ip, [r7, r3]
+/*
+1:	.long	.						// r3		 
+	.long	__pv_table_begin		// r4
+	.long	__pv_table_end			// r5
+2:	.long	__pv_phys_pfn_offset	// r6
+	.long	__pv_offset				// r7
+*/
 2:	cmp	r4, r5
 	ldrcc	r7, [r4], #4	@ use branch for delay slot
+							/* -- arch/arm/kernel/vmlinux.lds.S
+							.init.pv_table : {
+								__pv_table_begin = .;	// r4
+								*(.pv_table)			// r4 + 4
+								__pv_table_end = .;		// r4 + 8
+							}
+							*/
+							// r7에 결국 pv_table의 시작 포인터 값이 들어가 있음
 	bcc	1b
 	ret	lr
 #endif
