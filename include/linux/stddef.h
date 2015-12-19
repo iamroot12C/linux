@@ -17,5 +17,8 @@ enum {
 #define offsetof(TYPE,MEMBER) __compiler_offsetof(TYPE,MEMBER)
 #else
 #define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
+/*
+#define offsetof(TYPE, MEMBER) ((size_t) &((struct proc_info_list *)0)->__cpu_mm_mmu_flags)
+*/
 #endif
 #endif

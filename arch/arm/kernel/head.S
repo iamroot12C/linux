@@ -756,9 +756,10 @@ ARM_BE8(rev16	ip, ip)
 	orreq	ip, ip, r0      @ mask in offset bits 7-0
 #else
 	bic	ip, ip, #0x000000ff								// 0x000000ff의 bitwise not을 한거랑 ip랑 AND연산 해서 ip에 저장,
-														// 즉, ip의 하위 8비트를 클리어 해준겁니다.
+														// 즉, ip의 하위 8비트(immediate)를 클리어 해준겁니다.
 	tst	ip, #0xf00	@ check the rotation field			// 0xf00 = 0x00000f00, rotation field 가 0이면, imedi 필드만 계산하면되지.
-	orrne	ip, ip, r6	@ mask in offset bits 31-24		// rotation field 가 0이 아닐때 들어옴.
+	orrne	ip, ip, r6	@ mask in offset bits 31-24		// 64 bit operation. ref) arm/include/memory.h => __virt_to_phys()
+														// set immediate value to delta (rotation field 가 0이 아닐때 들어옴.)
 	biceq	ip, ip, #0x400000	@ clear bit 22
 	orreq	ip, ip, r0	@ mask in offset bits 7-0
 #endif
