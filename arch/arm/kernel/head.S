@@ -69,7 +69,6 @@
 
 	.globl	swapper_pg_dir // 전역변수 선언
 	.equ	swapper_pg_dir, KERNEL_RAM_VADDR - PG_DIR_SIZE
-
 	.macro	pgtbl, rd, phys // 함수 선언 page table 주소를 가져오는 함수
 	add	\rd, \phys, #TEXT_OFFSET
 	sub	\rd, \rd, #PG_DIR_SIZE
@@ -174,6 +173,14 @@ ENTRY(stext)
 	bl	__fixup_pv_table	// physical to virtual
 
 #endif
+
+
+	/* 2016. 01. 09. (토) 20:04:13 KST */
+	/* Source Driving presenter : Shim man-seop
+	/* 
+	/* Start Driving ...
+	/*									*/
+
 	bl	__create_page_tables
 
 	/*
@@ -199,7 +206,7 @@ ENDPROC(stext)
 #endif
 
 /*
- * Setup the initial page tables.  We only setup the barest
+ * Setup the initial page tables.  We only setup the barest 
  * amount which are required to get the kernel running, which
  * generally means mapping in the kernel code.
  *
@@ -210,6 +217,8 @@ ENDPROC(stext)
  *  r4 = page table (see ARCH_PGD_SHIFT in asm/memory.h)
  */
 __create_page_tables:
+	// r4 = 페이지 테이블 주소(page table), r8 = phys_offset
+	//  r8 = phys_offset, r9 = cpuid, r10 = procinfo
 	pgtbl	r4, r8				@ page table address
 
 	/*
@@ -217,7 +226,9 @@ __create_page_tables:
 	 */
 	mov	r0, r4
 	mov	r3, #0
-	add	r6, r0, #PG_DIR_SIZE
+	add	r6, r0, #PG_DIR_SIZE // PG_DIR_SIZE 만큼  230~234 라인 반복(loop)하겠다는 의미 
+							 // 해당 루프의 의미 : 페이지 테이블 초기화(r3 = 0)
+							 // 
 1:	str	r3, [r0], #4
 	str	r3, [r0], #4
 	str	r3, [r0], #4
@@ -226,15 +237,39 @@ __create_page_tables:
 	bne	1b
 
 #ifdef CONFIG_ARM_LPAE
+// 해당 옵션의 의미 : 4GB 이상 영역을 가리키기 위한 PageTable 을 Setting 해주는 Routine!!
+
 	/*
 	 * Build the PGD table (first level) to point to the PMD table. A PGD
 	 * entry is 64-bit wide.
 	 */
+
+	/* PAE(물리주소 확장) 옵션일때는 Page Global Directory 를 생성*/
+	/* 페이징 단계가 늘어남 ! */
+	//  r4 = 페이지 테이블 주소(page table), r8 = phys_offset
+	//  r9 = cpuid, r10 = procinfo
+	// L_PGD_SWAPPER = 마스터 page global directory?
+
+	// 250~254 줄 의 역할 첫번째 PMD의 위치,블록 속성,개수를 설정
+	// 첫번째 PGD를 setting 해주는 루틴
+	// LPAE 옵션이 켜졌으므로, 0x1000만큼 페이지 크기가 커짐.
+	// PageTable 시작 주소 + 0x1000 ~ PageTable 시작 주소 + 0x1000*PTRS_PER_PGD 구간 까지의 
+	// PageTable을 Setting. 해당 PageTable은 4GB이상 영역(LPAE)영역을 가리키는 페이지 테이블로 setting
 	mov	r0, r4
-	add	r3, r4, #0x1000			@ first PMD table address
-	orr	r3, r3, #3			@ PGD block type
-	mov	r6, #4				@ PTRS_PER_PGD
-	mov	r7, #1 << (55 - 32)		@ L_PGD_SWAPPER
+	add	r3, r4, #0x1000			@ first PGD table address(PGD+4096 == 첫번째 PMD 테이블)
+	orr	r3, r3, #3			@ PGD block type // 현재 setting 된 속성 P,R/W
+											 // P : 페이지 테이블이 메모리에 있는가?(1로 setting 된 경우)
+										    // R/W : 페이지 테이블에 쓰기 권한이 있는가? (1인경우 읽기/쓰기 가능, 0이면 읽기 만 가능 )
+	mov	r6, #4				@ PTRS_PER_PGD(PGD 엔트리 개수)
+	mov	r7, #1 << (55 - 32)		@ L_PGD_SWAPPER // (L_PGD_SWAPPER 를 표현할때 상위 32bit만 표현하기 위해 사용함) 나중에 다시 봐야함!
+
+	// r0 = 페이지 테이블(PGD) 주소
+	// r3 = 첫번째 PMD 테이블 주소(하위 비트를 속성을 표기하는데 사용함)
+	// r6 = PGD 의 엔트리 개수
+	// r7 = L_PGD_SWAPPER (page table 이름으로 추정?)
+
+// 64bit는 페이지 테이블 1개로 표현이 되지 않으므로,
+// 2개로 나눠서 표현, 23bit 영역을 setting 하는 이유 : 주소영역을 제한하기 위해서?
 1:
 #ifdef CONFIG_CPU_ENDIAN_BE8
 	str	r7, [r0], #4			@ set top PGD entry bits
@@ -252,6 +287,11 @@ __create_page_tables:
 	add	r4, r4, #4			@ we only write the bottom word
 #endif
 #endif
+
+
+ /* 2016. 01. 09. (토) 21:42:03 KST */
+ /* Shim man seop */
+ /* End Driving  */
 
 	ldr	r7, [r10, #PROCINFO_MM_MMUFLAGS] @ mm_mmuflags
 
@@ -644,7 +684,7 @@ ENDPROC(fixup_smp)
 __fixup_pv_table:
 	adr	r0, 1f		// r0 <- 1f's address
 	ldmia	r0, {r3-r7}
-	mvn	ip, #0		// mov ip, #0xffffffff
+	mvn	ip, #0		// mov ip, #0xffffffff 
 	subs	r3, r0, r3	@ PHYS_OFFSET + (~(PAGE_OFFSET)+1) // r0보다 r3가 더 클 경우 cc : carry clear.
 															// 밑에 strcc 에 영향을 미침.
 	add	r4, r4, r3	@ adjust table start address				// r3의 offset으로 r4 보정
@@ -655,7 +695,8 @@ __fixup_pv_table:
 								// r0에 페이지 프레임 개수 들어가 있음.
 	str	r0, [r6]	@ save computed PHYS_OFFSET to __pv_phys_pfn_offset
 								// 페이지 개수를 r6에 들어있는 주소에다가 넣고
-	strcc	ip, [r7, #HIGH_OFFSET]	@ save to __pv_offset high bits
+	strcc	ip, [r7, #HIGH_OFFSET]	@ save to __pv_offset high bits 
+									// delta 값이 음수가 나오는 경우 주소값 보정이 제대로 되지 않으므로, 상위비트에 -1(0xffffffff)을 넣어줌
 									// r7의 상위 비트에 ip에 있는 값을 넣는다. r7은 쿼드 이기때문에 8바이트, 즉 상위는 4바이트.
 	mov	r6, r3, lsr #24	@ constant for add/sub instructions	
 						// r3에 있는 값을 오른쪽으로 24비트 쭉 밀고, 민것을 r6에 넣는다. r6에는 하위 8비트만 저장되어 있음.
@@ -691,7 +732,7 @@ __fixup_a_pv_table:
 									// r6 에는 0x??000000	
 									// 즉, r0=-1 과 1을 더하니까 0이 나오고 Z 플래그 슨다.
 /*
-#ifdef CONFIG_THUMB2_KERNEL
+#ifdef CONFIG_THUMB2_KERNEL // THUMMB2 MODE 일 경우 21bit를 set 할 경우 mov 명령어에서 -> mvn 명령어로 변환이 됨!
 	moveq	r0, #0x200000	@ set bit 21, mov to mvn instruction
 	lsls	r6, #24
 	beq	2f
@@ -735,7 +776,8 @@ ARM_BE8(rev16	ip, ip)
 	ldr	r6, [r6, #LOW_OFFSET]	@ pv_offset low word	// r6의 하위 4바이트를 r6에 저장
 								// 0x??000000
 */
-#ifdef CONFIG_CPU_ENDIAN_BE8	//
+#ifdef CONFIG_CPU_ENDIAN_BE8	// 22bit를 set 할경우 mov명령어 에서 -> mvn명령어로  명령어 변환이 됨!
+							    // mov op code : 1101, mvn op code : 1111, 따라서 22bit만 set 할 경우 명령어가 변환이 됨. 
 	moveq	r0, #0x00004000	@ set bit 22, mov to mvn instruction
 #else
 	// Z 플래그가 섰으니까, eq이다. 
@@ -743,6 +785,7 @@ ARM_BE8(rev16	ip, ip)
 #endif
 	b	2f
 1:	ldr	ip, [r7, r3]				// r7 즉, instruction의 주소를 delta offset 으로 보정해서 ip 에 넣어줌.
+									// 이유 : 실시간으로 주소 변환을 하기 위해서 명령어의 immediate 값과 rotate 값을 변경.
 	/* 2015. 12. 12. (토) 20:48:09 KST
 	 * end driving 
 	 * DH kim
@@ -760,8 +803,8 @@ ARM_BE8(rev16	ip, ip)
 	tst	ip, #0xf00	@ check the rotation field			// 0xf00 = 0x00000f00, rotation field 가 0이면, imedi 필드만 계산하면되지.
 	orrne	ip, ip, r6	@ mask in offset bits 31-24		// 64 bit operation. ref) arm/include/memory.h => __virt_to_phys()
 														// set immediate value to delta (rotation field 가 0이 아닐때 들어옴.)
-	biceq	ip, ip, #0x400000	@ clear bit 22
-	orreq	ip, ip, r0	@ mask in offset bits 7-0
+	biceq	ip, ip, #0x400000	@ clear bit 22			// 상위 32bit를 처리 할 때만, 764~765 라인을 실행함 (이때는 rotate field 0)
+	orreq	ip, ip, r0	@ mask in offset bits 7-0		// rotate field 가 0 인 이유 상위 32bit만 가지고 처리를 하므로, 
 #endif
 	str	ip, [r7, r3]
 /*

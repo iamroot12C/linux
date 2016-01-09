@@ -215,7 +215,8 @@ extern const void *__pv_table_begin, *__pv_table_end;
 	: "=r" (t)					\
 	: "I" (__PV_BITS_7_0))
 
-#define __pv_add_carry_stub(x, y)			\
+// Carry 값을 상위 바이트에다 더하기.
+#define __pv_add_carry_stub(x, y)			\ 
 	__asm__ volatile("@ __pv_add_carry_stub\n"	\
 	"1:	adds	%Q0, %1, %2\n"			\
 	"	adc	%R0, %R0, #0\n"			\
@@ -226,6 +227,7 @@ extern const void *__pv_table_begin, *__pv_table_end;
 	: "r" (x), "I" (__PV_BITS_31_24)		\
 	: "cc")
 
+	// 주소값 계산하는 부분
 static inline phys_addr_t __virt_to_phys(unsigned long x)
 {
 	phys_addr_t t;
