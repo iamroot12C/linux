@@ -1,0 +1,358 @@
+diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
+index 5891927..f19f8de 100644
+--- a/arch/arm/kernel/head-common.S
++++ b/arch/arm/kernel/head-common.S
+@@ -84,30 +84,47 @@ ENDPROC(__vet_atags)
+  *  r2  = atags/dtb pointer
+  *  r9  = processor ID
+  */
+-	__INIT
++	__INIT // .init text 섹션이라고 알려주는 매크로.
+ __mmap_switched:
+-	adr	r3, __mmap_switched_data
++	adr	r3, __mmap_switched_data // mmap_switched data 를 r3 에 불러옴
+ 
++	// r4 = __data_loc, r5 = __sdata, r6 = __bss_start, r7 = _end
++	// fp register : Frame Pointer 레지스터 : (복귀 함수의 스택 포인터를 저장)
++	// * data_loc = 빌드되었을 때 바이너리에서의 데이터 섹션의 주소 
++	// * sdata = 메모리에 로드되었을 때 메모리의 주소
++	// XIP Mode 란? : 메모리에 이미지를 올리지 않고도 NAND Flash(ROM) Memory에서 바로 부팅이 가능한 기능
++	// 따라서, XIP 가 설정되어 있지 않다면, data_loc 과 sdata 가 같으므로, r4와 r5가 같게 된다.
++	// 하지만, XIP 가 설정되어있다면 data_loc과 sdata가 다르고,
++	// data_loc영역에 데이터 수정을 하지 못하므로 data_loc(롬에 있던 이미지)를
++	// s_data(메모리에 로드되는 영역)에 복사 해 주어야 함.
++	// 따라서, XIP Mode 가 설정되지 못하면다면 103 ~ 107라인을 실행하지 않음.
++	// band 참조
+ 	ldmia	r3!, {r4, r5, r6, r7}
+ 	cmp	r4, r5				@ Copy data segment if needed
+ 1:	cmpne	r5, r6
+-	ldrne	fp, [r4], #4
+-	strne	fp, [r5], #4
++	ldrne	fp, [r4], #4 // fp = *(__data_loc+4), (__data_loc+4 영역의 값을 fp 에 저장)
++	strne	fp, [r5], #4 // *(__sdata+4) = fp (fp 에 __sdata+4 영역의 값을)
+ 	bne	1b
+ 
++	// bss 영역 초기화 루틴
+ 	mov	fp, #0				@ Clear BSS (and zero fp)
+-1:	cmp	r6, r7
+-	strcc	fp, [r6],#4
+-	bcc	1b
++1:	cmp	r6, r7 // (bss_start - _end < 0) CarryClear == Lower / CarrySet == Higher or Same
++	strcc	fp, [r6],#4 // bss_start영역에 0을 채워 넣음.
++	bcc	1b //(bss_start == _end 이면 종료
+ 
+- ARM(	ldmia	r3, {r4, r5, r6, r7, sp})
++
++// r4 = processor id,r5 = __machine arch type, r6 = atag pointer, r7 = cr_alignment or 0
++// sp = init_thread_union + THREAD_START_SP 
++ ARM(	ldmia	r3, {r4, r5, r6, r7, sp}) 
+  THUMB(	ldmia	r3, {r4, r5, r6, r7}	)
+  THUMB(	ldr	sp, [r3, #16]		)
+-	str	r9, [r4]			@ Save processor ID
+-	str	r1, [r5]			@ Save machine type
+-	str	r2, [r6]			@ Save atags pointer
+-	cmp	r7, #0
+-	strne	r0, [r7]			@ Save control register values
++	str	r9, [r4]			@ Save processor ID // processor id 를 저장(r4 주소에)
++	str	r1, [r5]			@ Save machine type // machine을 저장(r5 주소에)
++	str	r2, [r6]			@ Save atags pointer // atag_pointer를 저장(r6 주소에)
++	cmp	r7, #0				// cr_alignment 체크
++	strne	r0, [r7]			@ Save control register values // cr_alignment 가 체크 되있으면, 
++										// control register value를 
++										// r7에 저장
+ 	b	start_kernel
+ ENDPROC(__mmap_switched)
+ 
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index a535a0e..9634c28 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -190,16 +190,17 @@ ENTRY(stext)
+ 	 * above.  On return, the CPU will be ready for the MMU to be
+ 	 * turned on, and r0 will hold the CPU control register value.
+ 	 */
++		// 스택 포인터에 mmap_switched 주소를 넣어줌
+ 	ldr	r13, =__mmap_switched		@ address to jump to after
+ 						@ mmu has been enabled
+-	adr	lr, BSYM(1f)			@ return (PIC) address
+-	mov	r8, r4				@ set TTBR1 to swapper_pg_dir
+- ARM(	add	pc, r10, #PROCINFO_INITFUNC	)
+- THUMB(	add	r12, r10, #PROCINFO_INITFUNC	)
+- THUMB(	ret	r12				)
++	adr	lr, BSYM(1f)			@ return (PIC) address // .ltorg 의 주소 == PIC_ADDRESS(__enable_mmu)
++	mov	r8, r4				@ set TTBR1 to swapper_pg_dir // TTBR1 에 swapper_pg_dir 을 세팅
++ ARM(	add	pc, r10, #PROCINFO_INITFUNC	) // lookup_process_type 에서 어떤 #PROC_INFO 함수를 불러올지 결정!
++ THUMB(	add	r12, r10, #PROCINFO_INITFUNC	) // 호출 뒤에 복귀 주소에 enable_mmu 를 지정 
++ THUMB(	ret	r12				) // THUMB Mode(16bit) 일때는 mmu enable 안함
+ 1:	b	__enable_mmu
+ ENDPROC(stext)
+-	.ltorg
++	.ltorg // 프로그램의 상수값을 저장하는 영역
+ #ifndef CONFIG_XIP_KERNEL
+ 2:	.long	.
+ 	.long	PAGE_OFFSET
+@@ -238,7 +239,7 @@ __create_page_tables:
+ 
+ #ifdef CONFIG_ARM_LPAE
+ // 해당 옵션의 의미 : 4GB 이상 영역을 가리키기 위한 PageTable 을 Setting 해주는 Routine!!
+-
++// 2단 페이징에서 3단 페이징으로 확장
+ 	/*
+ 	 * Build the PGD table (first level) to point to the PMD table. A PGD
+ 	 * entry is 64-bit wide.
+@@ -266,10 +267,12 @@ __create_page_tables:
+ 	// r0 = 페이지 테이블(PGD) 주소
+ 	// r3 = 첫번째 PMD 테이블 주소(하위 비트를 속성을 표기하는데 사용함)
+ 	// r6 = PGD 의 엔트리 개수
+-	// r7 = L_PGD_SWAPPER (page table 이름으로 추정?)
++	// r7 = L_PGD_SWAPPER (L_PGD_SWAPPER 옵션은, 페이지 테이블의 스와핑 영역을 가리키는 부분을 런타임 시점에서 미리 해제 되지 않게 보호해주는 옵션임  )
+ 
+ // 64bit는 페이지 테이블 1개로 표현이 되지 않으므로,
+ // 2개로 나눠서 표현, 23bit 영역을 setting 하는 이유 : 주소영역을 제한하기 위해서?
++
++// 초기화 루프
+ 1:
+ #ifdef CONFIG_CPU_ENDIAN_BE8
+ 	str	r7, [r0], #4			@ set top PGD entry bits
+@@ -293,38 +296,71 @@ __create_page_tables:
+  /* Shim man seop */
+  /* End Driving  */
+ 
+-	ldr	r7, [r10, #PROCINFO_MM_MMUFLAGS] @ mm_mmuflags
+ 
++/* 2016. 01. 16. (토) 15:19:44 KST */
++/* Shim man seop */
++/* Start Driving */
++
++// 본격적으로 PageTable Setting 시작.
++
++	// r4 = 페이지 테이블 주소(page table)
++	//  r8 = phys_offset, r9 = cpuid, r10 = procinfo
++
++	ldr	r7, [r10, #PROCINFO_MM_MMUFLAGS] @ mm_mmuflags  // procinfo 구조체의 MMU_FLAG 옵션을 가져옴.
++								// DEFINE와 offset_of 매크로를 이용해서 런타임때에 상수 값을 결정!
+ 	/*
+ 	 * Create identity mapping to cater for __enable_mmu.
+ 	 * This identity mapping will be removed by paging_init().
+ 	 */
+-	adr	r0, __turn_mmu_on_loc
+-	ldmia	r0, {r3, r5, r6}
++	adr	r0, __turn_mmu_on_loc // __turn_mmu_on_loc 구조체의 시작 주소를 넘겨줌
++	ldmia	r0, {r3, r5, r6} 		// r3 : . , r5 : turn_mmu_on, r6 : turn_mmu_on_end
++						// r7 : proc_info의 mm_mmuflag
++	// 316 ~ 318 line : turn_mmu_on 주소 보정 루틴
+ 	sub	r0, r0, r3			@ virt->phys offset
+ 	add	r5, r5, r0			@ phys __turn_mmu_on
+-	add	r6, r6, r0			@ phys __turn_mmu_on_end
+-	mov	r5, r5, lsr #SECTION_SHIFT
+-	mov	r6, r6, lsr #SECTION_SHIFT
+-
+-1:	orr	r3, r7, r5, lsl #SECTION_SHIFT	@ flags + kernel base
++	add	r6, r6, r0			@ phys __turn_mmu_on_end  
++	
++	// r5와 r6(각각 turn_mmu_on 의 시작주소와 끝 주소)의 상위 12bit(__turn_mmu_on의 base addr)만 남김
++	mov	r5, r5, lsr #SECTION_SHIFT	// SECTION_SHIFT : 20(Page Table Level : 2)
++	mov	r6, r6, lsr #SECTION_SHIFT	// SECTION_SHIFT : 21(Page Table Level : 3)
++
++	// (base_addr | flag) 의 값을 페이지 테이블에다가 넣어줌. 
++	// 해당 영역은 __turn_mmu_on영역을 가리키는 페이지 테이블
++	// 만약 __turn_mmu_on 의 섹션크기가 너무 경우 페이지 테이블을 추가로 할당함.(332 줄의 addlo 부분 참조)
++1:	orr	r3, r7, r5, lsl #SECTION_SHIFT	@ flags + kernel base // 상위 12bit가 kernel 이미지의 끝 주소.()
+ 	str	r3, [r4, r5, lsl #PMD_ORDER]	@ identity mapping
+ 	cmp	r5, r6
+ 	addlo	r5, r5, #1			@ next section
+ 	blo	1b
+ 
++
++	
+ 	/*
+ 	 * Map our RAM from the start to the end of the kernel .bss section.
++	 * 커널 영역 페이지 테이블 생성 루틴.
+ 	 */
+-	add	r0, r4, #PAGE_OFFSET >> (SECTION_SHIFT - PMD_ORDER)
+-	ldr	r6, =(_end - 1)
+-	orr	r3, r8, r7
+-	add	r6, r4, r6, lsr #(SECTION_SHIFT - PMD_ORDER)
++
++	// r4 = page table 시작 주소
++	// r7 = flag,  r8 = phys_offset(0x40000000) -> RAM 의 물리 시작 주소
++	// PAGE_OFFSET -> 0xC0000000
++	// PAGE_OFFSET >> (SECTION_SHIFT - PMD_ORDER) 0x3000
++
++	add	r0, r4, #PAGE_OFFSET >> (SECTION_SHIFT - PMD_ORDER) // 0x3000을 왜 더하는 것일까?
++								    // Page 시작 주소에서 0x3000 만큼 더한 위치 부터
++								    // 커널의 PageTable을 생성하겠다는 의미. 
++	
++	// 루프를 돌면서 커널 페이지 테이블 생성
++	// Page Table 크기 = 0x3000
++	ldr	r6, =(_end - 1) // _end --> .bss section 의 마지막 주소
++	orr	r3, r8, r7 
++	add	r6, r4, r6, lsr #(SECTION_SHIFT - PMD_ORDER) // _end의 상위 12bit 주소와 base_addr을 더함.
+ 1:	str	r3, [r0], #1 << PMD_ORDER
+ 	add	r3, r3, #1 << SECTION_SHIFT
+ 	cmp	r0, r6
+ 	bls	1b
+ 
++// XIP_KERNEL 부분은 PASS!!!!!!!
++/*
+ #ifdef CONFIG_XIP_KERNEL
+ 	/*
+ 	 * Map the kernel image separately as it is not located in RAM.
+@@ -343,13 +379,22 @@ __create_page_tables:
+ 	strls	r3, [r0], #1 << PMD_ORDER
+ 	bls	1b
+ #endif
+-
++*/
+ 	/*
+ 	 * Then map boot params address in r2 if specified.
+ 	 * We map 2 sections in case the ATAGs/DTB crosses a section boundary.
+ 	 */
+-	mov	r0, r2, lsr #SECTION_SHIFT
+-	movs	r0, r0, lsl #SECTION_SHIFT
++	
++	// DTB/ATAG 영역 페이지 테이블 Mapping
++	// 만약 부트로더 에서 인자가 넘어오면 r2에 인자의 주소가 들어있음.
++	// 이 경우에는 DTB/ATAG Mapping에 Section 2개를 차지함
++
++	// 페이지 테이블 생성 구조는 위의 라인과 유사함.
++	mov	r0, r2, lsr #SECTION_SHIFT // r0에 부트 파라미터 주소의 상위 12bit만 남김
++	movs	r0, r0, lsl #SECTION_SHIFT // flag setting
++					   // r0 가 0인 경우만 Z flag setting
++
++	// Boot loader에서 파라미터(인자)가 넘어오면 DTB/ATAG 의 페이지 테이블 영역을 Setting
+ 	subne	r3, r0, r8
+ 	addne	r3, r3, #PAGE_OFFSET
+ 	addne	r3, r4, r3, lsr #(SECTION_SHIFT - PMD_ORDER)
+@@ -358,11 +403,13 @@ __create_page_tables:
+ 	addne	r6, r6, #1 << SECTION_SHIFT
+ 	strne	r6, [r3]
+ 
++// 64bit 일때는 page table을 가리키는 주소를 보정 해야함
+ #if defined(CONFIG_ARM_LPAE) && defined(CONFIG_CPU_ENDIAN_BE8)
+ 	sub	r4, r4, #4			@ Fixup page table pointer
+ 						@ for 64-bit descriptors
+ #endif
+ 
++/* // Debug Stuff 도 패스!!!
+ #ifdef CONFIG_DEBUG_LL
+ #if !defined(CONFIG_DEBUG_ICEDCC) && !defined(CONFIG_DEBUG_SEMIHOSTING)
+ 	/*
+@@ -420,6 +467,11 @@ __create_page_tables:
+ 	str	r3, [r0]
+ #endif
+ #endif
++****/ // 여기까지 Debug Stuff 임, 넘어갑니다.
++
++
++
++// LPAE 옵션이 켜졌을시, 페이지 테이블을 가리키는 포인터를 을 PGD의 시작주소로 옮겨줌
+ #ifdef CONFIG_ARM_LPAE
+ 	sub	r4, r4, #0x1000		@ point to the PGD table
+ 	mov	r4, r4, lsr #ARCH_PGD_SHIFT
+@@ -514,9 +566,17 @@ __secondary_data:
+  *  r9  = processor ID
+  *  r13 = *virtual* address to jump to upon completion
+  */
++
++// boot/compressed/head.S 에서 비활성화 한, I-Cache, D-Cache, Branch-Prediction, 옵션을 활성화
++// CR_A -> Alignment_abort enable
++// CR_C -> D-Cache Enable
++// CR_Z -> Branch Prediction(분기 예측) 옵션을 활성화  
++// CR_I -> I-Cache Enable
++// bit가 1로 setting 되면 해당 옵션을 사용
++
+ __enable_mmu:
+ #if defined(CONFIG_ALIGNMENT_TRAP) && __LINUX_ARM_ARCH__ < 6
+-	orr	r0, r0, #CR_A
++	orr	r0, r0, #CR_A 
+ #else
+ 	bic	r0, r0, #CR_A
+ #endif
+@@ -529,13 +589,23 @@ __enable_mmu:
+ #ifdef CONFIG_CPU_ICACHE_DISABLE
+ 	bic	r0, r0, #CR_I
+ #endif
++
++// 64 bit가 아닐 때
++// #define domain_val(dom,type) ( (type) << (2*(dom)))
++// DOMAIN_USER -> User 메모리만 갖고있음
++// DOMAIN_KERNEL -> Kernel 메모리만 갖고있음
++// DOMAIN_TABLE -> PageTable 메모리?
++// DOMAIN_IO -> I/O 메모리만 갖고 있음.
++
+ #ifndef CONFIG_ARM_LPAE
++	
++	// Domain 권한을 설정하여 r5레지스터에 넣고 이 값을 P15에 전송
+ 	mov	r5, #(domain_val(DOMAIN_USER, DOMAIN_MANAGER) | \
+ 		      domain_val(DOMAIN_KERNEL, DOMAIN_MANAGER) | \
+ 		      domain_val(DOMAIN_TABLE, DOMAIN_MANAGER) | \
+ 		      domain_val(DOMAIN_IO, DOMAIN_CLIENT))
+-	mcr	p15, 0, r5, c3, c0, 0		@ load domain access register
+-	mcr	p15, 0, r4, c2, c0, 0		@ load page table pointer
++	mcr	p15, 0, r5, c3, c0, 0		@ load domain access register // domain access register에 r5를 로드
++	mcr	p15, 0, r4, c2, c0, 0		@ load page table pointer // page talbe pointer를 cp register 에 로드
+ #endif
+ 	b	__turn_mmu_on
+ ENDPROC(__enable_mmu)
+@@ -555,16 +625,26 @@ ENDPROC(__enable_mmu)
+  * other registers depend on the function called upon completion
+  */
+ 	.align	5
+-	.pushsection	.idmap.text, "ax"
++	.pushsection	.idmap.text, "ax" 
++					  /* 
++						 .idmap 영역은 1:1 identity mapping 영역이라하여 별도의 섹션에 저장.
++ 						* MMU를 켜는 순간에 다음으로 수행되는 명령들이 가상주소를 얻기 위해
++ 						* TLB를 통해 페이지 테이블에 접근하게 되는데 이 가상주소에 대응하는
++ 						* 매핑이 페이지 테이블에 있어야 한다.
++					   */
+ ENTRY(__turn_mmu_on)
+-	mov	r0, r0
+-	instr_sync
+-	mcr	p15, 0, r0, c1, c0, 0		@ write control reg
+-	mrc	p15, 0, r3, c0, c0, 0		@ read id reg
++	mov	r0, r0 // 명령어 수행순서(=동기화)를 보장하여, cp 명령어 실행의 오류를 방지하기위해 mov r0,r0와
++			// instr_sync 를 실행
++			// 쉽게 생각하여 Mutex 비스무리한거라 생각하면 될듯 싶음.
++	instr_sync 	
++	mcr	p15, 0, r0, c1, c0, 0		@ write control reg // r0 : enable 에서 Setting 해준 플래그를 cp15 에다가 써줌
++	mrc	p15, 0, r3, c0, c0, 0		@ read id reg // id register 를 가져옴.(MIDR을 읽어옴)
++						// Dummy 명령어로 추정
++						// 가져오는 이유 ?
+ 	instr_sync
+-	mov	r3, r3
+-	mov	r3, r13
+-	ret	r3
++	mov	r3, r3 // 명령어 수행순서를 보장하기 위해 실행하는 dummy 명령어 (위의 명령어와 역할이 같음)
++	mov	r3, r13 // r13 == __mmap_switched 함수 주소
++	ret	r3 // mmap_switched 함수로 분기.
+ __turn_mmu_on_end:
+ ENDPROC(__turn_mmu_on)
+ 	.popsection
+diff --git a/init/main.c b/init/main.c
+index 6f0f1c5..d8a2ccf 100644
+--- a/init/main.c
++++ b/init/main.c
+@@ -9,6 +9,13 @@
+  *  Simplified starting of init:  Michael A. Griffith <grif@acm.org>
+  */
+ 
++/*
++
++Entry Pointer : start_kernel 함수;
++
++*/
++
++
+ #define DEBUG		/* Enable initcall_debug */
+ 
+ #include <linux/types.h>
+@@ -486,6 +493,7 @@ static void __init mm_init(void)
+ 	vmalloc_init();
+ }
+ 
++// 여기서부터 시작
+ asmlinkage __visible void __init start_kernel(void)
+ {
+ 	char *command_line;

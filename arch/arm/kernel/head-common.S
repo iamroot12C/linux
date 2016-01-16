@@ -84,30 +84,47 @@ ENDPROC(__vet_atags)
  *  r2  = atags/dtb pointer
  *  r9  = processor ID
  */
-	__INIT
+	__INIT // .init text 섹션이라고 알려주는 매크로.
 __mmap_switched:
-	adr	r3, __mmap_switched_data
+	adr	r3, __mmap_switched_data // mmap_switched data 를 r3 에 불러옴
 
+	// r4 = __data_loc, r5 = __sdata, r6 = __bss_start, r7 = _end
+	// fp register : Frame Pointer 레지스터 : (복귀 함수의 스택 포인터를 저장)
+	// * data_loc = 빌드되었을 때 바이너리에서의 데이터 섹션의 주소 
+	// * sdata = 메모리에 로드되었을 때 메모리의 주소
+	// XIP Mode 란? : 메모리에 이미지를 올리지 않고도 NAND Flash(ROM) Memory에서 바로 부팅이 가능한 기능
+	// 따라서, XIP 가 설정되어 있지 않다면, data_loc 과 sdata 가 같으므로, r4와 r5가 같게 된다.
+	// 하지만, XIP 가 설정되어있다면 data_loc과 sdata가 다르고,
+	// data_loc영역에 데이터 수정을 하지 못하므로 data_loc(롬에 있던 이미지)를
+	// s_data(메모리에 로드되는 영역)에 복사 해 주어야 함.
+	// 따라서, XIP Mode 가 설정되지 못하면다면 103 ~ 107라인을 실행하지 않음.
+	// band 참조
 	ldmia	r3!, {r4, r5, r6, r7}
 	cmp	r4, r5				@ Copy data segment if needed
 1:	cmpne	r5, r6
-	ldrne	fp, [r4], #4
-	strne	fp, [r5], #4
+	ldrne	fp, [r4], #4 // fp = *(__data_loc+4), (__data_loc+4 영역의 값을 fp 에 저장)
+	strne	fp, [r5], #4 // *(__sdata+4) = fp (fp 에 __sdata+4 영역의 값을)
 	bne	1b
 
+	// bss 영역 초기화 루틴
 	mov	fp, #0				@ Clear BSS (and zero fp)
-1:	cmp	r6, r7
-	strcc	fp, [r6],#4
-	bcc	1b
+1:	cmp	r6, r7 // (bss_start - _end < 0) CarryClear == Lower / CarrySet == Higher or Same
+	strcc	fp, [r6],#4 // bss_start영역에 0을 채워 넣음.
+	bcc	1b //(bss_start == _end 이면 종료
 
- ARM(	ldmia	r3, {r4, r5, r6, r7, sp})
+
+// r4 = processor id,r5 = __machine arch type, r6 = atag pointer, r7 = cr_alignment or 0
+// sp = init_thread_union + THREAD_START_SP 
+ ARM(	ldmia	r3, {r4, r5, r6, r7, sp}) 
  THUMB(	ldmia	r3, {r4, r5, r6, r7}	)
  THUMB(	ldr	sp, [r3, #16]		)
-	str	r9, [r4]			@ Save processor ID
-	str	r1, [r5]			@ Save machine type
-	str	r2, [r6]			@ Save atags pointer
-	cmp	r7, #0
-	strne	r0, [r7]			@ Save control register values
+	str	r9, [r4]			@ Save processor ID // processor id 를 저장(r4 주소에)
+	str	r1, [r5]			@ Save machine type // machine을 저장(r5 주소에)
+	str	r2, [r6]			@ Save atags pointer // atag_pointer를 저장(r6 주소에)
+	cmp	r7, #0				// cr_alignment 체크
+	strne	r0, [r7]			@ Save control register values // cr_alignment 가 체크 되있으면, 
+										// control register value를 
+										// r7에 저장
 	b	start_kernel
 ENDPROC(__mmap_switched)
 
