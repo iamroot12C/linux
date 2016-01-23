@@ -20,7 +20,7 @@ static inline bool is_smp(void)
 	return false;
 #elif defined(CONFIG_SMP_ON_UP)
 	extern unsigned int smp_on_up;
-	return !!smp_on_up;
+	return !!smp_on_up; // 어떤 상수 값이 있으면 1로 넘겨줄려고 느낌표를 두개나!
 #else
 	return true;
 #endif

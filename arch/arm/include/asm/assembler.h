@@ -226,6 +226,11 @@
 	.popsection
 
 #ifdef CONFIG_SMP
+// http://stackcanary.com/?p=622
+// 귀찮은게 아니라 정말 설명을 잘해놓으셨습니다. 요약하자면
+// 9998 레이블은 ALT_SMP를 부를때마다 여러개로 정의가 되는것이고, 각각 부른곳의 레이블을 따라 주소가 저장됩니다.
+// 이렇게 저장된 smp_instruction의 주소와 up_instruction을 가지고
+// 예전에 보았던 fixup_smp_table을 통해 up를 smp로 바꿔주었었습니다.
 #define ALT_SMP(instr...)					\
 9998:	instr
 /*

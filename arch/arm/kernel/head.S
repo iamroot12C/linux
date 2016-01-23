@@ -707,7 +707,7 @@ ENDPROC(__fixup_smp)
 	.pushsection .data
 	.globl	smp_on_up
 smp_on_up:
-	ALT_SMP(.long	1)
+	ALT_SMP(.long	1)	// 태그따라서 1번으로 가세요.
 	ALT_UP(.long	0)
 	.popsection
 #endif

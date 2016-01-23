@@ -24,7 +24,9 @@
 static inline void set_my_cpu_offset(unsigned long off)
 {
 	/* Set TPIDRPRW */
-	asm volatile("mcr p15, 0, %0, c13, c0, 4" : : "r" (off) : "memory");
+	asm volatile("mcr p15, 0, %0, c13, c0, 4" : : "r" (off) : "memory");	// 어셈블리코드가 메모리를 변경할 것이라고 알림, to compiler
+																			// off값을 r0에 저장, r0의 값을 코프로세서 c13->c0->4 에다가 저장.
+																			// off에 들어있는 cpu코어는 프리빌리지드 온니 스레드만 동작시킨다.
 }
 
 static inline unsigned long __my_cpu_offset(void)

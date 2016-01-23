@@ -298,6 +298,7 @@ void set_task_stack_end_magic(struct task_struct *tsk)
 {
 	unsigned long *stackend;
 
+	// end of stack's address 를 구해왔으니까 그곳에다가!! 매직넘버를 넣어라! 라는 의미입니다.
 	stackend = end_of_stack(tsk);
 	*stackend = STACK_END_MAGIC;	/* for overflow detection */
 }

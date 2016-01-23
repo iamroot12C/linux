@@ -84,14 +84,23 @@
 extern unsigned int processor_id;
 
 #ifdef CONFIG_CPU_CP15
-#define read_cpuid(reg)							\
+#define read_cpuid(reg)							\	// reg에 5라는 값을 가져와요.
 	({								\
 		unsigned int __val;					\
-		asm("mrc	p15, 0, %0, c0, c0, " __stringify(reg)	\
-		    : "=r" (__val)					\
+		asm("mrc	p15, 0, %0, c0, c0, " __stringify(reg)	\	// c0 -> c0 -> 5 에는 MPDIR이 있습니다. 두둥!
+		    : "=r" (__val)					\					// r0의 값을 __val에 저장. 
 		    :							\
-		    : "cc");						\
-		__val;							\
+		    : "cc");						\					// cc는 컨디션코드인데, HW 레지스터를 변경 시키는 레지스터가 있을 경우, 클로버 리스트에 등록을 함으로써 컴파일러에게 알려준다.
+																// Processor Feature Register 0 is:
+																// - in CP15 c0
+																// - a 32-bit read-only register
+																// - accessible in privileged modes only.;							\
+																// 즉, 모드를 변경해야 CP15의 c0를 엑세스 할 수 있게 때문에
+																// 슈퍼바이저 모드를 하기위해 스테이터스 플래그를 건들수 밖에 없다.
+																// cc를 하면 꼭 cpu 스테이터스 플래그를 변경이 아니더라도 읽어오는 경우에도 해줘야 한다.
+																// cc 다음에 "r3" 같이 레지스터를 써주면, r3는 건들지 못하도록 해준다.
+																// 그래서 이러한 것을 알려주기 위해 cc 옵션을 넣는다.
+		__val;								\
 	})
 
 /*

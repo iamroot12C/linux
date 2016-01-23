@@ -459,6 +459,8 @@ static void __init boot_cpu_init(void)
 	set_cpu_possible(cpu, true);
 }
 
+// __weak 라는 지시어는 smp_~~가 다른 곳에 정의되어있으면 그걸 타고
+// 없으면 이걸 타라.!
 void __init __weak smp_setup_processor_id(void)
 {
 }
@@ -486,6 +488,22 @@ static void __init mm_init(void)
 	vmalloc_init();
 }
 
+/* 2016. 01. 23. (토) 15:14:40 KST
+ * Source Driving presenter : DH Kim
+ * 
+ * Start Driving ...
+ *
+ */
+
+// __visible means that ...
+// #define __visible __attribute__((externally_visible))
+// __visible == __attribute__((externally_visible)) 입니다.
+// 이 말은 컴파일과정에서 start_kernel 이라는 심볼은 글로벌하게 쓸 수 있도록 만들어 줍니다.
+// 그래서 boot/head.S에서 바로 브랜치 하여 이곳으로 넘어온 것 같습니다.
+// gcc 4.6 부터 이런 기능을 지원합니다. 어쩐지 __visible 을 태그로 따라가면 gcc5, gcc6 이라고 뜹니다.
+
+// __init means that ...
+// __init 을 붙여주면 텍스트영역에 할당 된다는 의미 입니다.
 asmlinkage __visible void __init start_kernel(void)
 {
 	char *command_line;
@@ -495,15 +513,21 @@ asmlinkage __visible void __init start_kernel(void)
 	 * Need to run as early as possible, to initialize the
 	 * lockdep hash:
 	 */
-	lockdep_init();
-	set_task_stack_end_magic(&init_task);
-	smp_setup_processor_id();
-	debug_objects_early_init();
+	lockdep_init();		
+	set_task_stack_end_magic(&init_task);	// init_task는 리눅스내부구조에서 보았던 task_struct이다. 
+											// task_struct를 초기화 하고 넘겨준다.
+	smp_setup_processor_id();	// 아키텍쳐 내의 여러 코어들의 아이디를 세팅해 주었습니다.
+	debug_objects_early_init();	// 디버깅할때 쓸려고 해시 버킷이랑 해시 리스트를 초기화.
+								// 자세히는 보지 않았습니다.
 
 	/*
 	 * Set up the the initial canary ASAP:
 	 */
-	boot_init_stack_canary();
+
+	// 여기서는 스택 버퍼오버플로우를 방지하기 위해 랜덤한 값이랑, 리눅스 버젼코드를 합성하여 stack_canary값을 세팅합니다.
+	boot_init_stack_canary();		// stack canary 란?
+									// http://stackcanary.com/?p=199
+									// 여기 그림을 보면서 이해를 해봅시다.
 
 	cgroup_init_early();
 

@@ -4014,6 +4014,8 @@ void lockdep_init(void)
 	if (lockdep_initialized)
 		return;
 
+	// classhasg_table, chainhash_table은 리스트헤더 배열이고 이녀석들을 초기화 해주는 것임.
+	// 이녀석들은 추후에 락 관련용으로 사용함.
 	for (i = 0; i < CLASSHASH_SIZE; i++)
 		INIT_LIST_HEAD(classhash_table + i);
 

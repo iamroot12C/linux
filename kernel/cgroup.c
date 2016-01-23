@@ -1627,7 +1627,22 @@ static void init_cgroup_root(struct cgroup_root *root,
 	struct cgroup *cgrp = &root->cgrp;
 
 	INIT_LIST_HEAD(&root->root_list);
-	atomic_set(&root->nr_cgrps, 1);
+	atomic_set(&root->nr_cgrps, 1);		// 왜 atomic_set이 아토믹하게 돌아가는지 모르겠음.
+										// http://stackcanary.com/?p=661
+										// 에 따르면
+										// ldrex, strex가 exclusive monitor를 클리어하는데, 요즘은 str이 자체적으로 해주기
+										// 때문에 이렇게 간단하게 아토믹하다고 함.
+										// 하지만 아직 str이 정확히 strex 기능을 하는지 의문.
+	
+	/* 2016. 01. 23. (토) 21:57:34 KST
+	 * end driving ...
+	 *
+	 * DH kim
+	 */
+
+
+
+
 	cgrp->root = root;
 	init_cgroup_housekeeping(cgrp);
 	idr_init(&root->cgroup_idr);

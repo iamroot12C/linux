@@ -493,11 +493,13 @@ u32 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = MPIDR_INVALID };
 void __init smp_setup_processor_id(void)
 {
 	int i;
-	u32 mpidr = is_smp() ? read_cpuid_mpidr() & MPIDR_HWID_BITMASK : 0;
+	u32 mpidr = is_smp() ? read_cpuid_mpidr() & MPIDR_HWID_BITMASK : 0;	// 24bit 만 가져오기위해 비트마스킹 실시!
 	u32 cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
 
-	cpu_logical_map(0) = cpu;
-	for (i = 1; i < nr_cpu_ids; ++i)
+	cpu_logical_map(0) = cpu;	// __cpu_logical_map[0] 에다가 cpu값을 넣습니다.
+								// __cpu_logical_map배열은 컴파일 때 배열크기가 정해지고 0으로 값이 초기화 됩니다.
+	for (i = 1; i < nr_cpu_ids; ++i)	// nr_cpu_ids 는 NR_CPUS 라고 컴파일때 정해지는 값으로 정해집니다.
+										// 즉, 코어의 개수에 따라 id가 존재.
 		cpu_logical_map(i) = i == cpu ? 0 : i;
 
 	/*
@@ -1116,5 +1118,3 @@ const struct seq_operations cpuinfo_op = {
 	.start	= c_start,
 	.next	= c_next,
 	.stop	= c_stop,
-	.show	= c_show
-};
