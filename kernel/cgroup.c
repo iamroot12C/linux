@@ -1610,12 +1610,13 @@ static void init_cgroup_housekeeping(struct cgroup *cgrp)
 	INIT_LIST_HEAD(&cgrp->self.children);
 	INIT_LIST_HEAD(&cgrp->cset_links);
 	INIT_LIST_HEAD(&cgrp->pidlists);
-	mutex_init(&cgrp->pidlist_mutex);
+	mutex_init(&cgrp->pidlist_mutex); // mutex 구조체 초기화.
 	cgrp->self.cgroup = cgrp;
-	cgrp->self.flags |= CSS_ONLINE;
-
+	cgrp->self.flags |= CSS_ONLINE; // CSS : cgroup subsystem
+									// CSS_ONLINE : 현재 사용가능(ONLINE)한 CSS를 나타내주는 변수
+	// 
 	for_each_subsys(ss, ssid)
-		INIT_LIST_HEAD(&cgrp->e_csets[ssid]);
+		INIT_LIST_HEAD(&cgrp->e_csets[ssid]); // csets : cgroup subsystem 의 배열?
 
 	init_waitqueue_head(&cgrp->offline_waitq);
 	INIT_WORK(&cgrp->release_agent_work, cgroup_release_agent);
@@ -1624,16 +1625,17 @@ static void init_cgroup_housekeeping(struct cgroup *cgrp)
 static void init_cgroup_root(struct cgroup_root *root,
 			     struct cgroup_sb_opts *opts)
 {
+	// Default root
 	struct cgroup *cgrp = &root->cgrp;
 
-	INIT_LIST_HEAD(&root->root_list);
-	atomic_set(&root->nr_cgrps, 1);		// 왜 atomic_set이 아토믹하게 돌아가는지 모르겠음.
-										// http://stackcanary.com/?p=661
-										// 에 따르면
-										// ldrex, strex가 exclusive monitor를 클리어하는데, 요즘은 str이 자체적으로 해주기
-										// 때문에 이렇게 간단하게 아토믹하다고 함.
-										// 하지만 아직 str이 정확히 strex 기능을 하는지 의문.
-	
+	INIT_LIST_HEAD(&root->root_list); // list_head 만 초기화
+	atomic_set(&root->nr_cgrps, 1);		// 명령어 수준에서 Atomic성을 보장 해 주기 위해
+									    // atomic_set을 정의.
+										// Counting을 Atomic하게 해야함!
+										// 예전에는 strex,ldrex 와 같은 명령어를 이용하여
+										// Atomic성을 보장해야 했는데, 요즘 ARM 프로세서는
+										// str,ldr을 그냥 써도 atomic이 자동으로 보장됨.
+										// (Hardware Dependency 함)
 	/* 2016. 01. 23. (토) 21:57:34 KST
 	 * end driving ...
 	 *
@@ -4967,8 +4969,8 @@ static void __init cgroup_init_subsys(struct cgroup_subsys *ss, bool early)
  */
 int __init cgroup_init_early(void)
 {
-	static struct cgroup_sb_opts __initdata opts;
-	struct cgroup_subsys *ss;
+	static struct cgroup_sb_opts __initdata opts; // init.data 영역 : 초기화때, 한번만 사용하는 영역임 :D
+	struct cgroup_subsys *ss;  // subsystem 관련 구조체, 자세히 보지는 않았습니다.
 	int i;
 
 	init_cgroup_root(&cgrp_dfl_root, &opts);

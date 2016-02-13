@@ -49,15 +49,18 @@
 void
 __mutex_init(struct mutex *lock, const char *name, struct lock_class_key *key)
 {
+	// mutex 내에서 spinlock 을 사용함.
+	// 이유 : wait_list구조체 보호를 위해서, 자세한 내용은 코드를 더 봐야 알 수 있음.
+
 	atomic_set(&lock->count, 1);
-	spin_lock_init(&lock->wait_lock);
+	spin_lock_init(&lock->wait_lock); // spinlock 초기화
 	INIT_LIST_HEAD(&lock->wait_list);
-	mutex_clear_owner(lock);
+	mutex_clear_owner(lock); // clear_owner 초기화 : task_structure 초기화.
 #ifdef CONFIG_MUTEX_SPIN_ON_OWNER
 	osq_lock_init(&lock->osq);
 #endif
 
-	debug_mutex_init(lock, name, key);
+	debug_mutex_init(lock, name, key); // debug option 없을 시에는 동작 X
 }
 
 EXPORT_SYMBOL(__mutex_init);

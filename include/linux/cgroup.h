@@ -635,6 +635,9 @@ struct task_struct *cgroup_taskset_next(struct cgroup_taskset *tset);
  */
 
 struct cgroup_subsys {
+
+	// API Handler 부분.
+
 	struct cgroup_subsys_state *(*css_alloc)(struct cgroup_subsys_state *parent_css);
 	int (*css_online)(struct cgroup_subsys_state *css);
 	void (*css_offline)(struct cgroup_subsys_state *css);
@@ -656,7 +659,7 @@ struct cgroup_subsys {
 	void (*bind)(struct cgroup_subsys_state *root_css);
 
 	int disabled;
-	int early_init;
+	int early_init; // init 판별하는 flag. 나중에 수정
 
 	/*
 	 * If %false, this subsystem is properly hierarchical -
@@ -670,8 +673,8 @@ struct cgroup_subsys {
 	 * cases.  Eventually, all subsystems will be made properly
 	 * hierarchical and this will go away.
 	 */
-	bool broken_hierarchy;
-	bool warned_broken_hierarchy;
+	bool broken_hierarchy; 
+	bool warned_broken_hierarchy; 
 
 	/* the following two fields are initialized automtically during boot */
 	int id;

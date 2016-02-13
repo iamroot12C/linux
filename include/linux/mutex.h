@@ -90,6 +90,10 @@ struct mutex_waiter {
  *
  * It is not allowed to initialize an already locked mutex.
  */
+
+// 1 Macro 에서 중괄호를 쓰기 위해서
+// Band 에 올린 예제 참조.(2016-02-13)
+// 2 컴파일러가 잡아주지 못하는 오타 혹은 버그를 방지하기 위해 Do while로 Indentation
 # define mutex_init(mutex) \
 do {							\
 	static struct lock_class_key __key;		\

@@ -47,6 +47,8 @@ extern int lock_stat;
  * lockclass-key into the kernel (or module) .data section. (For
  * static locks we use the lock address itself as the key.)
  */
+
+// mutex_flag 를 bit단위로 쓰기위해 __packed__ 를 이용하여 1byte단위로 선언
 struct lockdep_subclass_key {
 	char __one_byte;
 } __attribute__ ((__packed__));
