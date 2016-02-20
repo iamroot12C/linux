@@ -130,9 +130,16 @@ static struct cgroup_subsys *cgroup_subsys[] = {
 #undef SUBSYS
 
 /* array of cgroup subsystem names */
-#define SUBSYS(_x) [_x ## _cgrp_id] = #_x,
+// SUBSYS매크로 1번을 들어가시면 전처리된 작업을 볼수있습니다.
+// _x_cgrp_id의 숫자가 정의되었고 그를 이용하여 아래의 작업을 수행.
+#define SUBSYS(_x) [_x ## _cgrp_id] = #_x,	// #연산자는 문자열로 바꿔줌.
 static const char *cgroup_subsys_name[] = {
 #include <linux/cgroup_subsys.h>
+	// 그렇다면 헤더파일은 아래와 같이 바뀌고, 변수안에 순차적으로 아래와 같이 저장된다.
+	// cpuset,
+	// cpu,
+	// 등등
+
 };
 #undef SUBSYS
 
@@ -203,7 +210,7 @@ static int cgroup_idr_alloc(struct idr *idr, void *ptr, int start, int end,
 
 	idr_preload(gfp_mask);
 	spin_lock_bh(&cgroup_idr_lock);
-	ret = idr_alloc(idr, ptr, start, end, gfp_mask);
+	ret = idr_alloc(idr, ptr, start, end, gfp_mask);	// lock 하고 여기들어감.
 	spin_unlock_bh(&cgroup_idr_lock);
 	idr_preload_end();
 	return ret;
@@ -4928,6 +4935,8 @@ static void __init cgroup_init_subsys(struct cgroup_subsys *ss, bool early)
 	/* We don't handle early failures gracefully */
 	BUG_ON(IS_ERR(css));
 	init_and_link_css(css, ss, &cgrp_dfl_root.cgrp);
+	// 여기까지 하면 http://blog.csdn.net/wudongxu/article/details/8474456의 그림처럼 cgroup이 css를 가리키게 된다.
+
 
 	/*
 	 * Root csses are never destroyed and we can't initialize
@@ -4976,7 +4985,15 @@ int __init cgroup_init_early(void)
 	init_cgroup_root(&cgrp_dfl_root, &opts);
 	cgrp_dfl_root.cgrp.self.flags |= CSS_NO_REF;
 
+/*  Date & Time : 2016. 02. 20. (토) 14:38:46 KST
+	Name : Daehui kim
+
+	Starting ...
+   */
+
 	RCU_INIT_POINTER(init_task.cgroups, &init_css_set);
+
+
 
 	for_each_subsys(ss, i) {
 		WARN(!ss->css_alloc || !ss->css_free || ss->name || ss->id,
@@ -4987,7 +5004,7 @@ int __init cgroup_init_early(void)
 		     "cgroup_subsys_name %s too long\n", cgroup_subsys_name[i]);
 
 		ss->id = i;
-		ss->name = cgroup_subsys_name[i];
+		ss->name = cgroup_subsys_name[i];	// 타고들어가면 설명있습니다.
 
 		if (ss->early_init)
 			cgroup_init_subsys(ss, true);

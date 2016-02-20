@@ -228,7 +228,8 @@ static int sub_alloc(struct idr *idp, int *starting_id, struct idr_layer **pa,
  restart:
 	p = idp->top;
 	l = idp->layers;
-	pa[l--] = NULL;
+	pa[l--] = NULL;		// pa가 전 레이어를 가리키기때문에 맨 마지막 요소는 null해줘야 한다.
+						// 당연히 맨앞의 레이어는 전 레이어가 없기 때문이다.
 	while (1) {
 		/*
 		 * We run around this while until we reach the leaf node...
@@ -294,7 +295,7 @@ static int idr_get_empty_slot(struct idr *idp, int starting_id,
 	int layers, v, id;
 	unsigned long flags;
 
-	id = starting_id;
+	id = starting_id;	// 1
 build_up:
 	p = idp->top;
 	layers = idp->layers;
@@ -310,7 +311,8 @@ build_up:
 	 */
 	while (id > idr_max(layers)) {
 		layers++;
-		if (!p->count) {
+		if (!p->count) {	// 현재 레이어가 논맆노드라면 하위 레이어 노드의 개수, 맆노드라면 현재 레이어에 생성된 ID의 개수.
+							// 아무튼 아무것도 없을 때의 예외처리.
 			/* special case: if the tree is currently empty,
 			 * then we grow the tree by moving the top node
 			 * upwards.
@@ -335,17 +337,21 @@ build_up:
 			spin_unlock_irqrestore(&idp->lock, flags);
 			return -ENOMEM;
 		}
-		new->ary[0] = p;
+		// 주석으로 그림표현 불가.
+		// 밴드의 그림을 참조하시면 레이어생성과정을 보실 수 있습니다.
+		new->ary[0] = p;	// new가 top을 가리키게 된다.
 		new->count = 1;
 		new->layer = layers-1;
-		new->prefix = id & idr_layer_prefix_mask(new->layer);
+		new->prefix = id & idr_layer_prefix_mask(new->layer);	// 몇번째idr을 사용하였는지
+
 		if (bitmap_full(p->bitmap, IDR_SIZE))
 			__set_bit(0, new->bitmap);
-		p = new;
+		p = new;	// p가 top이므로, 결국 top이 new를 가리키게 된다.
 	}
 	rcu_assign_pointer(idp->top, p);
 	idp->layers = layers;
-	v = sub_alloc(idp, &id, pa, gfp_mask, layer_idr);
+	v = sub_alloc(idp, &id, pa, gfp_mask, layer_idr);	// 실질적으로 이 함수가 id를 생성
+														// pa배열에 생성했던 레이어들을 거꾸로 넣어준다. (백트래킹을 하기 위함임)
 	if (v == -EAGAIN)
 		goto build_up;
 	return(v);
@@ -447,18 +453,23 @@ EXPORT_SYMBOL(idr_preload);
  * or iteration can be performed under RCU read lock provided the user
  * destroys @ptr in RCU-safe way after removal from idr.
  */
+//
+// 이 함수의 내용은 꽤 깁니다. 아래의 블로그가 설명을 잘해주셨습니다.
+// http://egloos.zum.com/studyfoss/v/5187192
 int idr_alloc(struct idr *idr, void *ptr, int start, int end, gfp_t gfp_mask)
+//						css->idr	css			1		2		GFP_KERNEL
 {
 	int max = end > 0 ? end - 1 : INT_MAX;	/* inclusive upper limit */
-	struct idr_layer *pa[MAX_IDR_LEVEL + 1];
+	struct idr_layer *pa[MAX_IDR_LEVEL + 1];	// *pa[4+1], 사실은 4.75나왔음.
+												// idr_layer을 5개 만들었으니 32*5개의 id생성?
 	int id;
 
 	might_sleep_if(gfp_mask & __GFP_WAIT);
 
 	/* sanity checks */
-	if (WARN_ON_ONCE(start < 0))
+	if (WARN_ON_ONCE(start < 0))	// 해당사항 없음 통과
 		return -EINVAL;
-	if (unlikely(max < start))
+	if (unlikely(max < start))		// 통과
 		return -ENOSPC;
 
 	/* allocate id */
@@ -467,6 +478,12 @@ int idr_alloc(struct idr *idr, void *ptr, int start, int end, gfp_t gfp_mask)
 		return id;
 	if (unlikely(id > max))
 		return -ENOSPC;
+
+	/* date & time : 2016. 02. 20. (토) 17:49:32 KST
+		name : daehui kim
+
+		End Driving ...
+	 */
 
 	idr_fill_slot(idr, ptr, id, pa);
 	return id;

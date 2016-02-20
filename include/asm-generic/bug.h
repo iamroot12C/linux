@@ -93,7 +93,7 @@ extern void warn_slowpath_null(const char *file, const int line);
 #ifndef WARN
 #define WARN(condition, format...) ({						\
 	int __ret_warn_on = !!(condition);				\
-	if (unlikely(__ret_warn_on))					\
+	if (unlikely(__ret_warn_on))					\ //unlikely는 10번중9번이 flase라면 컴파일러에게 거짓일 경우가 더 많다는 것을 알려주는 함수, likely는 이와 반대.
 		__WARN_printf(format);					\
 	unlikely(__ret_warn_on);					\
 })

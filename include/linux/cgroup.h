@@ -41,9 +41,15 @@ extern int proc_cgroup_show(struct seq_file *m, struct pid_namespace *ns,
 			    struct pid *pid, struct task_struct *tsk);
 
 /* define the enumeration of all cgroup subsystems */
-#define SUBSYS(_x) _x ## _cgrp_id,
+// 이게 전처리로 미리 처리가되어 enum으로 숫자가 정의됩니다. 후에 이 숫자를 이용하여
+// cgroup_subsys_name을 채우게 됩니다.
+#define SUBSYS(_x) _x ## _cgrp_id,		// 매크로에서 ##연산자는 붙여주는 연산자
+										// ex) a ## b은 ab가 됨.
 enum cgroup_subsys_id {
-#include <linux/cgroup_subsys.h>
+#include <linux/cgroup_subsys.h>		// 방금 이어붙인거를 토대로 enum에 채워지게 됨.
+										// cpuset_cgrp_id,
+										// cpu_cgrp_id,
+										// 그래서 위의 매크로 마지막에 콤마(,)가 붙는것임.
 	CGROUP_SUBSYS_COUNT,
 };
 #undef SUBSYS
@@ -253,6 +259,8 @@ struct cgroup {
 	 * following lists all css_sets which point to this cgroup's css
 	 * for the given subsystem.
 	 */
+	// 현재 cgroup에서 가장 가까운 조상cgroup안의 사용가능한 subset들의 모임
+	// e_csets의 e는 enable 같음.
 	struct list_head e_csets[CGROUP_SUBSYS_COUNT];
 
 	/*
