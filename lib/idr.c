@@ -174,17 +174,17 @@ static void idr_mark_full(struct idr_layer **pa, int id)
 	struct idr_layer *p = pa[0];
 	int l = 0;
 
-	__set_bit(id & IDR_MASK, p->bitmap);
+	__set_bit(id & IDR_MASK, p->bitmap);	// bitmap에 id의 값을 set한 것 임.
 	/*
 	 * If this layer is full mark the bit in the layer above to
 	 * show that this part of the radix tree is full.  This may
 	 * complete the layer above and require walking up the radix
 	 * tree.
 	 */
-	while (bitmap_full(p->bitmap, IDR_SIZE)) {
-		if (!(p = pa[++l]))
+	while (bitmap_full(p->bitmap, IDR_SIZE)) {	// bitmap의 모든 요소가 가득 차 있으면 1을 반환해줍니다.
+		if (!(p = pa[++l]))	// pa[0]의 다음것을 넣어봤떠니 주소가 없어? 그럼 break;, 있어? 그럼 통과.!!
 			break;
-		id = id >> IDR_BITS;
+		id = id >> IDR_BITS/*=8*/;
 		__set_bit((id & IDR_MASK), p->bitmap);
 	}
 }
@@ -365,9 +365,12 @@ static void idr_fill_slot(struct idr *idr, void *ptr, int id,
 			  struct idr_layer **pa)
 {
 	/* update hint used for lookup, cleared from free_layer() */
-	rcu_assign_pointer(idr->hint, pa[0]);
+	rcu_assign_pointer(idr->hint, pa[0]);	// 포인터를 할당하는데 rcu를 이용하여 아토믹하게 할당함 (내부에 베리어를 이용하여 다른 프로세스의 접근을 막음)
+											// hint에 pa[0]을 할당함.
+											// hint에 마지막으로 할당된 레이어를 넣어줌.
 
-	rcu_assign_pointer(pa[0]->ary[id & IDR_MASK], (struct idr_layer *)ptr);
+	rcu_assign_pointer(pa[0]->ary[id & IDR_MASK], (struct idr_layer *)ptr);	// ptr은 css를 들고들어왔는데 왜 형변환 하는지 모르겠음.
+
 	pa[0]->count++;
 	idr_mark_full(pa, id);
 }

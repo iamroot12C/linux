@@ -59,9 +59,9 @@ EXPORT_SYMBOL(__bitmap_empty);
 
 int __bitmap_full(const unsigned long *bitmap, unsigned int bits)
 {
-	unsigned int k, lim = bits/BITS_PER_LONG;
+	unsigned int k, lim = bits/BITS_PER_LONG;	// 256/32 = 8
 	for (k = 0; k < lim; ++k)
-		if (~bitmap[k])
+		if (~bitmap[k])	// 전부 차있으면 통과.
 			return 0;
 
 	if (bits % BITS_PER_LONG)
