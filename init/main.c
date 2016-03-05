@@ -103,7 +103,9 @@ static inline void mark_rodata_ro(void) { }
  * operations which are not allowed with IRQ disabled are allowed while the
  * flag is set.
  */
-bool early_boot_irqs_disabled __read_mostly;
+bool early_boot_irqs_disabled __read_mostly; // __read_mostly : 이 데이터는 자주 수정되지 않으며 대부분 읽기 연산만 이루어진다는 것을 명시
+											 // 내부 원리는 읽기연산만 이루어지는 데이터들을 같은 캐시라인에 모아 둠으로써, 캐시라인 불일치시 
+											 // 데이터를 버리는 행위로 인해 일어나는 overhead를 방지함으로써, 동작함.
 
 enum system_states system_state __read_mostly;
 EXPORT_SYMBOL(system_state);
@@ -451,12 +453,15 @@ void __init parse_early_param(void)
 
 static void __init boot_cpu_init(void)
 {
-	int cpu = smp_processor_id();
+	int cpu = smp_processor_id(); // processor_id를 받아옴
+	// core logical id : 실제로 가져오는 processor_id?
+	// booting 시에 random 으로 processor가 선택되기 때문에 맨 처음에 동작되는 CPU를 0번으로 설정해줌.
+	// 그리고 그에 맞춰서 setting 을 해줌.
 	/* Mark the boot cpu "present", "online" etc for SMP and UP case */
-	set_cpu_online(cpu, true);
-	set_cpu_active(cpu, true);
-	set_cpu_present(cpu, true);
-	set_cpu_possible(cpu, true);
+	set_cpu_online(cpu, true); // online flag setting 
+	set_cpu_active(cpu, true); // active flag setting
+	set_cpu_present(cpu, true); // present flag setting
+	set_cpu_possible(cpu, true); // possible flag setting
 }
 
 // __weak 라는 지시어는 smp_~~가 다른 곳에 정의되어있으면 그걸 타고
@@ -528,17 +533,25 @@ asmlinkage __visible void __init start_kernel(void)
 	boot_init_stack_canary();		// stack canary 란?
 									// http://stackcanary.com/?p=199
 									// 여기 그림을 보면서 이해를 해봅시다.
+									
+	cgroup_init_early(); // 나중에 다시한번!
 
-	cgroup_init_early();
+
+/* 2016. 03. 05. (토) 16:16:06 KST */
+/* Start Driving : Shim man seop */
 
 	local_irq_disable();
-	early_boot_irqs_disabled = true;
-
+	early_boot_irqs_disabled = true; // 기본 setting(메모리,page table,etc.. )를 위해서 interrupt 를 disable 함.
+									 // read_mostly macro 이용
 /*
  * Interrupts are still disabled. Do necessary setups, then
  * enable them
  */
-	boot_cpu_init();
+	boot_cpu_init(); // cpu flag setting 함수
+
+/* 2016. 03. 05. (토) 21:45:25 KST */
+/* End Driving */
+
 	page_address_init();
 	pr_notice("%s", linux_banner);
 	setup_arch(&command_line);

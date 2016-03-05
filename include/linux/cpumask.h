@@ -652,7 +652,7 @@ static inline size_t cpumask_size(void)
  * other type of cpumask_var_t implementation is configured.
  */
 #ifdef CONFIG_CPUMASK_OFFSTACK
-typedef struct cpumask *cpumask_var_t;
+typedef struct cpumask *cpumask_var_t; // cpu가 여러개일때.
 
 #define this_cpu_cpumask_var_ptr(x) this_cpu_read(x)
 
@@ -665,7 +665,7 @@ void free_cpumask_var(cpumask_var_t mask);
 void free_bootmem_cpumask_var(cpumask_var_t mask);
 
 #else
-typedef struct cpumask cpumask_var_t[1];
+typedef struct cpumask cpumask_var_t[1]; // cpu가 1개만 있을때.
 
 #define this_cpu_cpumask_var_ptr(x) this_cpu_ptr(x)
 
@@ -731,7 +731,7 @@ void init_cpu_online(const struct cpumask *src);
  * to_cpumask - convert an NR_CPUS bitmap to a struct cpumask *
  * @bitmap: the bitmap
  *
- * There are a few places where cpumask_var_t isn't appropriate and
+ * There are a few places where cpumask_var_t isn't appropriate and 
  * static cpumasks must be used (eg. very early boot), yet we don't
  * expose the definition of 'struct cpumask'.
  *
@@ -739,8 +739,8 @@ void init_cpu_online(const struct cpumask *src);
  */
 #define to_cpumask(bitmap)						\
 	((struct cpumask *)(1 ? (bitmap)				\
-			    : (void *)sizeof(__check_is_bitmap(bitmap))))
-
+			    : (void *)sizeof(__check_is_bitmap(bitmap)))) // unsigned long 형 이 아닐경우 compile error를 발생시키기 위해서, 위와 같이 작성.
+															 // 런타임 에러는 찾기가 힘들기 때문에, 차라리 컴파일 단계에서 에러를 잡아내기 위해서 위와 같이 작성.
 static inline int __check_is_bitmap(const unsigned long *bitmap)
 {
 	return 1;

@@ -743,7 +743,7 @@ EXPORT_SYMBOL(cpu_active_mask);
 void set_cpu_possible(unsigned int cpu, bool possible)
 {
 	if (possible)
-		cpumask_set_cpu(cpu, to_cpumask(cpu_possible_bits));
+		cpumask_set_cpu(cpu, to_cpumask(cpu_possible_bits))
 	else
 		cpumask_clear_cpu(cpu, to_cpumask(cpu_possible_bits));
 }

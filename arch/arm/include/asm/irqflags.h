@@ -43,10 +43,10 @@ static inline void arch_local_irq_enable(void)
 static inline void arch_local_irq_disable(void)
 {
 	asm volatile(
-		"	cpsid i			@ arch_local_irq_disable"
-		:
-		:
-		: "memory", "cc");
+		"	cpsid i			@ arch_local_irq_disable" // "cpsid i" 자체가 한개의 명령어
+		:					// cpsid 명령어 : 우선순위를 제일 높여줘서, 다른 인터럽트가 무시된다. 
+		:  					// 어셈블리 코드가 메모리를 변경할 것이라고 컴파일러에게 알려주고, 컴파일러가 레지스터에 저장된 모든 변수를 갱신.
+		: "memory", "cc"); // cc : condition code flag(상태플래그 레지스터),    
 }
 
 #define local_fiq_enable()  __asm__("cpsie f	@ __stf" : : : "memory", "cc")
