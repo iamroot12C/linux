@@ -552,7 +552,10 @@ asmlinkage __visible void __init start_kernel(void)
 /* 2016. 03. 05. (토) 21:45:25 KST */
 /* End Driving */
 
-	page_address_init();
+/* 2016. 03. 12. (토) 15:21:25 KST */
+/* Start Driving : Kim dong ho */
+
+	page_address_init();		// defined(CONFIG_HIGHMEM) && !defined(WANT_PAGE_VIRTUAL) 경우 L1 캐쉬 바이트 초기화
 	pr_notice("%s", linux_banner);
 	setup_arch(&command_line);
 	mm_init_cpumask(&init_mm);

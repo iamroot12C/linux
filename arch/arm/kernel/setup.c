@@ -587,7 +587,10 @@ static void __init setup_processor(void)
 	 * types.  The linker builds this table for us from the
 	 * entries in arch/arm/mm/proc-*.S
 	 */
-	list = lookup_processor_type(read_cpuid_id());
+	/* head-common.S 에서 현재 cpuid와 링커스트립트에 정의된 프로세서ID와의
+	 * 반복비교문을 통해 proc_info_list구조체를 가져온다.
+	 */
+	list = lookup_processor_type(read_cpuid_id()); 
 	if (!list) {
 		pr_err("CPU configuration botched (ID %08x), unable to continue.\n",
 		       read_cpuid_id());
@@ -595,20 +598,29 @@ static void __init setup_processor(void)
 	}
 
 	cpu_name = list->cpu_name;
-	__cpu_architecture = __get_cpu_architecture();
+	__cpu_architecture = __get_cpu_architecture(); // bit 연산으로 cpu architecture얻어옴
 
 #ifdef MULTI_CPU
+	// MULTI_CPU on if CPU_V7
+	// or CONFIG_CPU***가 다른 종류로 두번 정의된 경우
 	processor = *list->proc;
 #endif
-#ifdef MULTI_TLB
+#ifdef MULTI_TLB 
+	// MULTI_TLB on if SMP on
+	// TLB : 변환 색인 버퍼(Translation Lookaside Buffer, TLB)는 가상 메모리 주소를 물리적인 주소로 변환하는 속도를 높이기 위해 사용되는 캐시
 	cpu_tlb = *list->tlb;
 #endif
 #ifdef MULTI_USER
+	// MULTI_CPU와 같은 방식으로 on
 	cpu_user = *list->user;
 #endif
 #ifdef MULTI_CACHE
+	// MULTI_CPU와 같은 방식으로 on
 	cpu_cache = *list->cache;
 #endif
+	
+	/* 2016. 03. 12. (토) 21:51:16 KST */
+	/* TODO : MULTI_CPU why???? */
 
 	pr_info("CPU: %s [%08x] revision %d (ARMv%s), cr=%08lx\n",
 		cpu_name, read_cpuid_id(), read_cpuid_id() & 15,

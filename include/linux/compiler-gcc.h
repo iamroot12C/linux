@@ -44,6 +44,9 @@
 #define __must_be_array(arr) 0
 #else
 /* &a[0] degrades to a pointer: a different type from an array */
+/* __same_type에서 첫번째 인자에는 배열의 자료형과 두번째 인자에는 배열의 포인터형이 들어간다.
+ * 그러므로 배열이 아닐경우 same_type의 리턴값은 1이 나오며 BUILD_BUG_ON_ZERO매크로에서 컴파일 에러를 리턴
+ */
 #define __must_be_array(a) BUILD_BUG_ON_ZERO(__same_type((a), &(a)[0]))
 #endif
 

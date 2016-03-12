@@ -156,6 +156,7 @@ static inline unsigned int __attribute_const__ read_cpuid_ext(unsigned offset)
  * compiler that it's constant.  Use this function to read the CPU ID
  * rather than directly reading processor_id or read_cpuid() directly.
  */
+/*  __const 같은 경우 함수 내부에서 절대로 전역 변수에 접근할 수 없고, 포인터 인수를 받을 수도 없도록 한다. */
 static inline unsigned int __attribute_const__ read_cpuid_id(void)
 {
 	return read_cpuid(CPUID_ID);

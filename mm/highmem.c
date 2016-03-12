@@ -393,10 +393,11 @@ static struct page_address_map page_address_maps[LAST_PKMAP];
 /*
  * Hash table bucket
  */
+/* ____cacheline_aligned_in_smp : 64bit smp환경이면 64bit로 allign */
 static struct page_address_slot {
 	struct list_head lh;			/* List of page_address_maps */
 	spinlock_t lock;			/* Protect this bucket's list */
-} ____cacheline_aligned_in_smp page_address_htable[1<<PA_HASH_ORDER];
+} ____cacheline_aligned_in_smp page_address_htable[1<<PA_HASH_ORDER];	
 
 static struct page_address_slot *page_slot(const struct page *page)
 {
@@ -479,6 +480,7 @@ void __init page_address_init(void)
 {
 	int i;
 
+	/* ARRAY_SIZE 매크로 분석, ctags 따라가보길 */
 	for (i = 0; i < ARRAY_SIZE(page_address_htable); i++) {
 		INIT_LIST_HEAD(&page_address_htable[i].lh);
 		spin_lock_init(&page_address_htable[i].lock);
