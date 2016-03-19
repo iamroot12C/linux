@@ -27,7 +27,7 @@
 #define CPUID_EXT_ISAR3	0x6c
 #define CPUID_EXT_ISAR4	0x70
 #define CPUID_EXT_ISAR5	0x74
-#else
+#else	// 우리는 요기!
 #define CPUID_EXT_PFR0	"c1, 0"
 #define CPUID_EXT_PFR1	"c1, 1"
 #define CPUID_EXT_DFR0	"c1, 2"

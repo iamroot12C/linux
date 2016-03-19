@@ -264,7 +264,7 @@ static int __get_cpu_architecture(void)
 }
 #endif
 
-int __pure cpu_architecture(void)
+int __pure cpu_architecture(void)	// __pure : 같은 아규먼트를 넘겨주면 항상 같은 결과를 봔한한다. 
 {
 	BUG_ON(__cpu_architecture == CPU_ARCH_UNKNOWN);
 
@@ -315,16 +315,21 @@ static void __init cacheid_init(void)
 		if ((cachetype & (7 << 29)) == 4 << 29) {
 			/* ARMv7 register format */
 			arch = CPU_ARCH_ARMv7;
-			cacheid = CACHEID_VIPT_NONALIASING;
+			cacheid = CACHEID_VIPT_NONALIASING;		// #define CACHEID_VIPT_NONALIASING	(1 << 1)
+													// #define CACHEID_VIPT_ALIASING		(1 << 2)
 			switch (cachetype & (3 << 14)) {
 			case (1 << 14):
-				cacheid |= CACHEID_ASID_TAGGED;
+				cacheid |= CACHEID_ASID_TAGGED;	// 110, ASID가 100임.
 				break;
 			case (3 << 14):
-				cacheid |= CACHEID_PIPT;
+				cacheid |= CACHEID_PIPT;		// 10010, PIPT가 10000임
 				break;
-			}
-		} else {
+			}	// 캐시를 공부하고 합시다.!!!
+	/* End driving : daeui
+
+2016. 03. 19. (토) 21:59:32 KST
+	 */
+		} else {	// 우리는 v6가 아니니까 패스
 			arch = CPU_ARCH_ARMv6;
 			if (cachetype & (1 << 23))
 				cacheid = CACHEID_VIPT_ALIASING;
@@ -377,9 +382,13 @@ static void __init cpuid_init_hwcaps(void)
 	if (cpu_architecture() < CPU_ARCH_ARMv7)
 		return;
 
-	divide_instrs = (read_cpuid_ext(CPUID_EXT_ISAR0) & 0x0f000000) >> 24;
-
-	switch (divide_instrs) {
+	divide_instrs = (read_cpuid_ext(CPUID_EXT_ISAR0) & 0x0f000000) >> 24;	// 0x41xxxxxx 이랑 0x0f000000 엔드한거고, 0x41은 implementer code 이고 41은 ARM이다
+																			// 결국 이 라인은 divide_instrs 에 1이 저장된다.
+																			// CPUID_EXIR_ISAR0 = "c2 0"
+																			// Cortex-A9에서 CPUID_EXT_ISAR0는 0x00101111로 되어있다.
+																			// 밑에꺼를 지원하는 아키텍쳐도 있꼬 지원안하는것도 있는듯.
+																			// 검색해도 잘 안나옴.
+	switch (divide_instrs) {	// SDIV, UDIV명령어를 지원하는지 구분하려고 이렇게 한다.
 	case 2:
 		elf_hwcap |= HWCAP_IDIVA;
 	case 1:
@@ -387,35 +396,43 @@ static void __init cpuid_init_hwcaps(void)
 	}
 
 	/* LPAE implies atomic ldrd/strd instructions */
-	vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
-	if (vmsa >= 5)
-		elf_hwcap |= HWCAP_LPAE;
+	vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;	// MMFR : Memory Model Feature Register
+															// Cortex-A9은 0x00100103 으로 되어 있따.
+															// 맨끝3은 VMSA:Virtual Memory System Architecture 을 나타낸다.
+															
+	if (vmsa >= 5)		// vmsa가 0이면 지원안함, 라지 피지컬 어드레스 익스텐션(LPAE)	
+						// 값이 5이상이면 Long Descriptor Translation Table을 지원해줌. 그냥 LPAE에서 쓰는 방식이다.
+		elf_hwcap |= HWCAP_LPAE;	// HWCAP_LPAE : 1<<20, 
 }
 
 static void __init elf_hwcap_fixup(void)
 {
-	unsigned id = read_cpuid_id();
+	unsigned id = read_cpuid_id();	// unsigned만 쓰면 unsigned long이다.
 	unsigned sync_prim;
 
 	/*
-	 * HWCAP_TLS is available only on 1136 r1p0 and later,
+	 * HWCAP_TLS is available only on 1136 r1p0 and later,	// TLS : Thread Local Storage = 스레드 관련 데이터를 저장할수있는 스토리지,
+	 														// arm 에서 tls 레지스터가 있다.
+															// #define HWCAP_TLS	(1 << 15)
+															// r1p0는 first release 를 의미함.
+
 	 * see also kuser_get_tls_init.
 	 */
-	if (read_cpuid_part() == ARM_CPU_PART_ARM1136 &&
-	    ((id >> 20) & 3) == 0) {
-		elf_hwcap &= ~HWCAP_TLS;
+	if (read_cpuid_part() == ARM_CPU_PART_ARM1136 &&		// #define ARM_CPU_PART_ARM1136		0x4100b360
+	    ((id >> 20) & 3) == 0) {	// cpuid의 21,22는 varient인데 이것은 릴리즈 버젼을 말함, 그니까 위에서 말한거 체크할라고!!
+		elf_hwcap &= ~HWCAP_TLS;	// 지워주는 거지.
 		return;
 	}
 
 	/* Verify if CPUID scheme is implemented */
-	if ((id & 0x000f0000) != 0x000f0000)
+	if ((id & 0x000f0000) != 0x000f0000)	// ARMv7 = 1111 이얌. 이거는 f일때만 넘어가고 아니면 return으로 나가버린다.
 		return;
 
 	/*
 	 * If the CPU supports LDREX/STREX and LDREXB/STREXB,
-	 * avoid advertising SWP; it may not be atomic with
+	 * avoid advertising SWP; it may not be atomic with		// swp 가 시스템버스에 lock  걸고 ldr, str했는데 지금은 ldrex, strex로 함.
 	 * multiprocessing cores.
-	 */
+	 */	
 	sync_prim = ((read_cpuid_ext(CPUID_EXT_ISAR3) >> 8) & 0xf0) |
 		    ((read_cpuid_ext(CPUID_EXT_ISAR4) >> 20) & 0x0f);
 	if (sync_prim >= 0x13)
@@ -626,21 +643,24 @@ static void __init setup_processor(void)
 		cpu_name, read_cpuid_id(), read_cpuid_id() & 15,
 		proc_arch[cpu_architecture()], get_cr());
 
-	snprintf(init_utsname()->machine, __NEW_UTS_LEN + 1, "%s%c",
-		 list->arch_name, ENDIANNESS);
+	snprintf(init_utsname()->machine, __NEW_UTS_LEN + 1, "%s%c",	// 이렇게 하면 첫번째 캐릭터만 찍힌다.
+		 list->arch_name, ENDIANNESS);								// ENDIANNESS : 엔디안이 상관없다는 말인데, 코드를 보면 머신에 따라 "ㅣ" 또는 "b" 를 가져온다. 머신이 리틀엔디안이면 l을 가져올 것이고, 빅엔디안이면 b를 가져올 것이니까 상관없다는 말.
 	snprintf(elf_platform, ELF_PLATFORM_SIZE, "%s%c",
 		 list->elf_name, ENDIANNESS);
-	elf_hwcap = list->elf_hwcap;
+	elf_hwcap = list->elf_hwcap;	// elf_hwcap : 하드웨어 지원사항을 나타낸다.
 
+	/* start driving : Daehui
+		2016. 03. 19. (토) 16:25:04 KST
+	 */
 	cpuid_init_hwcaps();
 
 #ifndef CONFIG_ARM_THUMB
-	elf_hwcap &= ~(HWCAP_THUMB | HWCAP_IDIVT);
+	elf_hwcap &= ~(HWCAP_THUMB | HWCAP_IDIVT);	// THUMB가 없으면, THUMB 관련된거 지워줌.
 #endif
 #ifdef CONFIG_MMU
 	init_default_cache_policy(list->__cpu_mm_mmu_flags);
 #endif
-	erratum_a15_798181_init();
+	erratum_a15_798181_init();	// 넘어가기로 했음.
 
 	elf_hwcap_fixup();
 

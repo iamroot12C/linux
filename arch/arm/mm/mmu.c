@@ -130,7 +130,7 @@ static unsigned long initial_pmd_value __initdata = 0;
  * assembly code, which avoids an illegal state where the TLBs can get
  * confused.  See comments in early_cachepolicy() for more information.
  */
-void __init init_default_cache_policy(unsigned long pmd)
+void __init init_default_cache_policy(unsigned long pmd)	// page middle directory 에서 TEX랑 C(캐싱), B(버퍼링)의 플래그를 가지고 어떤 캐시 정책으로 디폴트 초기화를 할 건지 정해주는 함수.
 {
 	int i;
 
