@@ -688,23 +688,23 @@ const void * __init of_flat_dt_match_machine(const void *default_match,
 {
 	const void *data = NULL;
 	const void *best_data = default_match;
-	const char *const *compat;
+	const char *const *compat; // 주소값 fixed : Read-Only 바뀌면 안됨!
 	unsigned long dt_root;
 	unsigned int best_score = ~1, score = 0;
 
 	dt_root = of_get_flat_dt_root();
-	while ((data = get_next_compat(&compat))) {
+	while ((data = get_next_compat(&compat))) { // Iterator 로 macihe_desc를 1개씩 가져와서 확인.
 		score = of_flat_dt_match(dt_root, compat);
 		if (score > 0 && score < best_score) {
-			best_data = data;
-			best_score = score;
+			best_data = data; // best_xxxx => 자기가 찾을 것 들
+			best_score = score; // 매칭 여부 확인(몇개가 matching 되었는가)
 		}
 	}
-	if (!best_data) {
+	if (!best_data) { // device_tree 가 존재 하지 않는 경우.
 		const char *prop;
 		int size;
 
-		pr_err("\n unrecognized device tree list:\n[ ");
+		pr_err("\n unrecognized device tree list:\n[ "); // 으앙 쥬금
 
 		prop = of_get_flat_dt_prop(dt_root, "compatible", &size);
 		if (prop) {
@@ -715,12 +715,12 @@ const void * __init of_flat_dt_match_machine(const void *default_match,
 			}
 		}
 		printk("]\n\n");
-		return NULL;
+		return NULL; // 못찾으면 NULL 반환
 	}
 
-	pr_info("Machine model: %s\n", of_flat_dt_get_machine_name());
+	pr_info("Machine model: %s\n", of_flat_dt_get_machine_name()); // Model 이름 찍어줌.
 
-	return best_data;
+	return best_data; // 찾은 Data를 반환
 }
 
 #ifdef CONFIG_BLK_DEV_INITRD
@@ -1012,7 +1012,7 @@ bool __init early_init_dt_verify(void *params)
 		return false;
 
 	/* check device tree validity */
-	if (fdt_check_header(params))
+	if (fdt_check_header(params)) // __vet_atag와 같은 역할.
 		return false;
 
 	/* Setup flat device-tree pointer */
@@ -1026,13 +1026,13 @@ bool __init early_init_dt_verify(void *params)
 void __init early_init_dt_scan_nodes(void)
 {
 	/* Retrieve various information from the /chosen node */
-	of_scan_flat_dt(early_init_dt_scan_chosen, boot_command_line);
+	of_scan_flat_dt(early_init_dt_scan_chosen, boot_command_line); // command_line 옵션을 flatted_dtb에 설정
 
 	/* Initialize {size,address}-cells info */
-	of_scan_flat_dt(early_init_dt_scan_root, NULL);
+	of_scan_flat_dt(early_init_dt_scan_root, NULL); // size, 주소 정보를 설정
 
 	/* Setup memory, calling early_init_dt_add_memory_arch */
-	of_scan_flat_dt(early_init_dt_scan_memory, NULL);
+	of_scan_flat_dt(early_init_dt_scan_memory, NULL); // 메모리(MMIO) 관런 setting
 }
 
 bool __init early_init_dt_scan(void *params)

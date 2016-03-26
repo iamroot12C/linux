@@ -180,7 +180,7 @@ bool arch_match_cpu_phys_id(int cpu, u64 phys_id)
 {
 	return phys_id == cpu_logical_map(cpu);
 }
-
+// Iteration 돌면서 1개씩 추가.
 static const void * __init arch_get_next_mach(const char *const **match)
 {
 	static const struct machine_desc *mdesc = __arch_info_begin;
@@ -206,26 +206,27 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
 	const struct machine_desc *mdesc, *mdesc_best = NULL;
 
 #ifdef CONFIG_ARCH_MULTIPLATFORM
-	DT_MACHINE_START(GENERIC_DT, "Generic DT based system")
-	MACHINE_END
+	DT_MACHINE_START(GENERIC_DT, "Generic DT based system") // name으로 dtb 검색
+		// 여기다 확장
+	MACHINE_END // 내용 : "};" : DT_MACHINE_START랑 세트로 다님. 이유는 확장을 위해서.
 
-	mdesc_best = &__mach_desc_GENERIC_DT;
+	mdesc_best = &__mach_desc_GENERIC_DT; //위에서 DT_MACHINE_START 에서 설정한 값을 mdesc_best 에다가 setting
 #endif
 
-	if (!dt_phys || !early_init_dt_verify(phys_to_virt(dt_phys)))
+	if (!dt_phys || !early_init_dt_verify(phys_to_virt(dt_phys))) // 주소가 존재하지 않거나, device tree 가 존재하지 않으면, 즉 DTB가 없으면 NULL을 반환
 		return NULL;
 
 	mdesc = of_flat_dt_match_machine(mdesc_best, arch_get_next_mach);
 
-	if (!mdesc) {
+	if (!mdesc) { // dtb가 없는 경우(커널 모듈과 드라이버 모듈이 mismatch)
 		const char *prop;
 		int size;
 		unsigned long dt_root;
 
-		early_print("\nError: unrecognized/unsupported "
+		early_print("\nError: unrecognized/unsupported " // message 찍어줌.
 			    "device tree compatible list:\n[ ");
 
-		dt_root = of_get_flat_dt_root();
+		dt_root = of_get_flat_dt_root();  // NULL 가져옴
 		prop = of_get_flat_dt_prop(dt_root, "compatible", &size);
 		while (size > 0) {
 			early_print("'%s' ", prop);
@@ -234,17 +235,18 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
 		}
 		early_print("]\n\n");
 
-		dump_machine_table(); /* does not return */
+		dump_machine_table(); /* does not return */ // machine table 값들 찍어주고 freeze.
 	}
 
 	/* We really don't want to do this, but sometimes firmware provides buggy data */
-	if (mdesc->dt_fixup)
-		mdesc->dt_fixup();
+	if (mdesc->dt_fixup) 
+		mdesc->dt_fixup(); // dt_fixup 멤버 변수는 보통 null이며 특별히 펌웨어에 문제가 있어 수정되어야 하는 경우 이 멤버 변수에 fixup 관련 함수를 등록하여 사용한다.
 
-	early_init_dt_scan_nodes();
+	early_init_dt_scan_nodes(); // command line을 flatted_dtb에 설정.
 
 	/* Change machine number to match the mdesc we're using */
-	__machine_arch_type = mdesc->nr;
+	__machine_arch_type = mdesc->nr; // __machine_arch_type을 설정.
+									// 보드 버전에 맞게 machine number를 수정;
 
-	return mdesc;
+	return mdesc; // machine_descriptor 반환.
 }

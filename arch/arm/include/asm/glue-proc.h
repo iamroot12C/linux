@@ -107,7 +107,7 @@
 #ifdef CONFIG_CPU_ARM940T
 # ifdef CPU_NAME
 #  undef  MULTI_CPU
-#  define MULTI_CPU
+#  define MULTI_CPU // MULTI CORE
 # else
 #  define CPU_NAME cpu_arm940
 # endif

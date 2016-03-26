@@ -131,10 +131,10 @@ EXPORT_SYMBOL(outer_cache);
 int __cpu_architecture __read_mostly = CPU_ARCH_UNKNOWN;
 
 struct stack {
-	u32 irq[3];
-	u32 abt[3];
-	u32 und[3];
-	u32 fiq[3];
+	u32 irq[3]; // inturrpt
+	u32 abt[3]; // Data Abort
+	u32 und[3]; // Undefined
+	u32 fiq[3]; // fast irq 
 } ____cacheline_aligned;
 
 #ifndef CONFIG_CPU_V7M
@@ -329,14 +329,24 @@ static void __init cacheid_init(void)
 
 2016. 03. 19. (토) 21:59:32 KST
 	 */
+
+// 2016. 03. 26. (토) 16:06:11 KST
+/*
+ 	Shim man seop
+	Start Driving...
+ 
+ */
+	// Virtual Address : CPU 상에서의 Address
+	// Logical Address : CPU -> Page Table을 거쳐가는 Address
+	// Physical Address : 메모리 상에서의 Address
 		} else {	// 우리는 v6가 아니니까 패스
-			arch = CPU_ARCH_ARMv6;
-			if (cachetype & (1 << 23))
+			arch = CPU_ARCH_ARMv6; // Cache 방식을 VIPT 로 사용하고, Alias || Non-Alias 로 설정. 
+			if (cachetype & (1 << 23)) // Cache-Type을 가지고 옴.
 				cacheid = CACHEID_VIPT_ALIASING;
 			else
 				cacheid = CACHEID_VIPT_NONALIASING;
 		}
-		if (cpu_has_aliasing_icache(arch))
+		if (cpu_has_aliasing_icache(arch)) // I-Cache 부분 초기화
 			cacheid |= CACHEID_VIPT_I_ALIASING;
 	} else {
 		cacheid = CACHEID_VIVT;
@@ -447,9 +457,9 @@ static void __init elf_hwcap_fixup(void)
 void notrace cpu_init(void)
 {
 #ifndef CONFIG_CPU_V7M
-	unsigned int cpu = smp_processor_id();
-	struct stack *stk = &stacks[cpu];
-
+	unsigned int cpu = smp_processor_id(); // process_id 를 얻어옴, 0번 CPU 가지고 옴.
+	struct stack *stk = &stacks[cpu]; // 해당 CPU의 스택을 가지고 옴.
+									  // stack에 들어있는것 : irq stack,data abort, fiq, undefined
 	if (cpu >= NR_CPUS) {
 		pr_crit("CPU%u: bad primary CPU number\n", cpu);
 		BUG();
@@ -459,20 +469,21 @@ void notrace cpu_init(void)
 	 * This only works on resume and secondary cores. For booting on the
 	 * boot cpu, smp_prepare_boot_cpu is called after percpu area setup.
 	 */
-	set_my_cpu_offset(per_cpu_offset(cpu));
-
-	cpu_proc_init();
+	set_my_cpu_offset(per_cpu_offset(cpu)); // per_cpu 라는 자료구조의 offset을 가지고 옴.
+											// 들어오는 CPU와 그것에 해당하는 CPU의 Stack을 Mapping 해 줌. 
+	cpu_proc_init(); // architecture 에 따른 proc_init 함수의 주소를 가지고 옴.
 
 	/*
 	 * Define the placement constraint for the inline asm directive below.
 	 * In Thumb-2, msr with an immediate value is not allowed.
 	 */
-#ifdef CONFIG_THUMB2_KERNEL
-#define PLC	"r"
+#ifdef CONFIG_THUMB2_KERNEL // 인터럽트 모드 설정 관련 부분.
+#define PLC	"r" // register flag
 #else
-#define PLC	"I"
+#define PLC	"I" // Immediate flag
 #endif
-
+	// exception handler 관련 스택 잡아주는 부분.
+	// u-boot 단에서 잡힌 exception handler 부분을 새롭게 재설정 해주는 부분이다.
 	/*
 	 * setup stacks for re-entrant exception handlers
 	 */
@@ -492,8 +503,8 @@ void notrace cpu_init(void)
 	"msr	cpsr_c, %9"
 	    :
 	    : "r" (stk),
-	      PLC (PSR_F_BIT | PSR_I_BIT | IRQ_MODE),
-	      "I" (offsetof(struct stack, irq[0])),
+	      PLC (PSR_F_BIT | PSR_I_BIT | IRQ_MODE), 
+	      "I" (offsetof(struct stack, irq[0])), 
 	      PLC (PSR_F_BIT | PSR_I_BIT | ABT_MODE),
 	      "I" (offsetof(struct stack, abt[0])),
 	      PLC (PSR_F_BIT | PSR_I_BIT | UND_MODE),
@@ -524,7 +535,7 @@ void __init smp_setup_processor_id(void)
 	 * using percpu variable early, for example, lockdep will
 	 * access percpu variable inside lock_release
 	 */
-	set_my_cpu_offset(0);
+	set_my_cpu_offset(0); // CPU 스택 간에 데이터 동기화를 위해서 함수를 호출. CPU 스택의 주소를 CP15(TP~~)에 박아넣음.
 
 	pr_info("Booting Linux on physical CPU 0x%x\n", mpidr);
 }
@@ -637,7 +648,8 @@ static void __init setup_processor(void)
 #endif
 	
 	/* 2016. 03. 12. (토) 21:51:16 KST */
-	/* TODO : MULTI_CPU why???? */
+	/* TODO : MULTI_CPU why */
+	// 이유 : 부팅때 부터 core 여러개가 한꺼번에 돌기 때문에.
 
 	pr_info("CPU: %s [%08x] revision %d (ARMv%s), cr=%08lx\n",
 		cpu_name, read_cpuid_id(), read_cpuid_id() & 15,
@@ -674,11 +686,11 @@ void __init dump_machine_table(void)
 
 	early_print("Available machine support:\n\nID (hex)\tNAME\n");
 	for_each_machine_desc(p)
-		early_print("%08x\t%s\n", p->nr, p->name);
+		early_print("%08x\t%s\n", p->nr, p->name); // message버퍼를 거치지 않고, uart로 바로 전송.
 
 	early_print("\nPlease check your kernel config and/or bootloader.\n");
 
-	while (true)
+	while (true) // freeze_
 		/* can't use cpu_relax() here as it may require MMU setup */;
 }
 
@@ -930,9 +942,9 @@ void __init setup_arch(char **cmdline_p)
 {
 	const struct machine_desc *mdesc;
 
-	setup_processor();
-	mdesc = setup_machine_fdt(__atags_pointer);
-	if (!mdesc)
+	setup_processor(); // 현재까지 Core 1개가 돔.
+	mdesc = setup_machine_fdt(__atags_pointer); // flatted_device_tree 설정
+	if (!mdesc) // device_tree 가 없는 경우에 atag로 설정
 		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
 	machine_desc = mdesc;
 	machine_name = mdesc->name;

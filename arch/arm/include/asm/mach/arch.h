@@ -44,11 +44,11 @@ struct machine_desc {
 	unsigned char		reserve_lp1 :1;	/* never has lp1	*/
 	unsigned char		reserve_lp2 :1;	/* never has lp2	*/
 	enum reboot_mode	reboot_mode;	/* default restart mode	*/
-	unsigned		l2c_aux_val;	/* L2 cache aux value	*/
+	unsigned		l2c_aux_val;	/* L2 cache aux value	*/ 
 	unsigned		l2c_aux_mask;	/* L2 cache aux mask	*/
-	void			(*l2c_write_sec)(unsigned long, unsigned);
-	struct smp_operations	*smp;		/* SMP operations	*/
-	bool			(*smp_init)(void);
+	void			(*l2c_write_sec)(unsigned long, unsigned);  
+	struct smp_operations	*smp;		/* SMP operations	*/ 
+	bool			(*smp_init)(void); 							
 	void			(*fixup)(struct tag *, char **);
 	void			(*dt_fixup)(void);
 	void			(*init_meminfo)(void);
@@ -93,9 +93,9 @@ static const struct machine_desc __mach_desc_##_type	\
 
 #define DT_MACHINE_START(_name, _namestr)		\
 static const struct machine_desc __mach_desc_##_name	\
- __used							\
+ __used	 /*포인터가 끊겨도(객체를 참조하지 않아도) 컴파일러가 제거하지 않도록 한다 */						\
  __attribute__((__section__(".arch.info.init"))) = {	\
-	.nr		= ~0,				\
-	.name		= _namestr,
+	.nr		= ~0,				\ /* .nr 을 -1으로 setting */
+	.name		= _namestr,      /* 이름으로 검색 */
 
 #endif
