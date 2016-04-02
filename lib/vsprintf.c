@@ -1834,6 +1834,8 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
 		size = end - buf;
 	}
 
+	// printf("asdasd %s %d asdasd", a, b);
+	// 에서 ""의 시작주소가 fmt이고 하나씩 넘어가면서 각 타입에 맞게 넣어주고 있다.
 	while (*fmt) {
 		const char *old_fmt = fmt;
 		int read = format_decode(fmt, &spec);

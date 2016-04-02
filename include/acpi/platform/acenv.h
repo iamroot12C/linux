@@ -388,12 +388,14 @@ typedef char *va_list;
 
 /* Storage alignment properties */
 
-#define  _AUPBND                (sizeof (acpi_native_int) - 1)
+#define  _AUPBND                (sizeof (acpi_native_int) - 1)	// 4-1 = 3
 #define  _ADNBND                (sizeof (acpi_native_int) - 1)
 
 /* Variable argument list macro definitions */
 
-#define _bnd(X, bnd)            (((sizeof (X)) + (bnd)) & (~(bnd)))
+#define _bnd(X, bnd)            (((sizeof (X)) + (bnd)) & (~(bnd))) // (4+3) & (~3)
+																	/// 0111 & 1100 하면 0100 이니까,
+																	// 이렇게 하면 4바이트로 allign된다.
 #define va_arg(ap, T)           (*(T *)(((ap) += (_bnd (T, _AUPBND))) - (_bnd (T,_ADNBND))))
 #define va_end(ap)              (ap = (va_list) NULL)
 #define va_start(ap, A)         (void) ((ap) = (((char *) &(A)) + (_bnd (A,_AUPBND))))

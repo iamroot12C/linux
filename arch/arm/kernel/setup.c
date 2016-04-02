@@ -454,6 +454,8 @@ static void __init elf_hwcap_fixup(void)
  *
  * cpu_init sets up the per-CPU stacks.
  */
+// secondary core 들이 부팅될때 다시 이 함수를 실행시키기 때문에
+// 각 코어에 맞는 id와 스택을 가지고 한다.
 void notrace cpu_init(void)
 {
 #ifndef CONFIG_CPU_V7M
@@ -469,9 +471,12 @@ void notrace cpu_init(void)
 	 * This only works on resume and secondary cores. For booting on the
 	 * boot cpu, smp_prepare_boot_cpu is called after percpu area setup.
 	 */
-	set_my_cpu_offset(per_cpu_offset(cpu)); // per_cpu 라는 자료구조의 offset을 가지고 옴.
-											// 들어오는 CPU와 그것에 해당하는 CPU의 Stack을 Mapping 해 줌. 
-	cpu_proc_init(); // architecture 에 따른 proc_init 함수의 주소를 가지고 옴.
+	set_my_cpu_offset(per_cpu_offset(cpu)); // per_cpu_offset값은 smp_prepare_boot_cpu() 전에 값을 설정해 준다.
+											// cpu off set 이 들어가는게 맞다.
+											// secondary cores 들이 여기를 똑같이 타고 들어온다.! secondary kernel 이 또 있음.! 
+											
+	cpu_proc_init(); 	// MULTI_CPU 에 따라 정해진 CPU_NAME을 이용한 CPU_NAME_proc_init()를 실행 함.
+						// architecture 에 따른 proc_init 함수의 주소를 가지고 옴.
 
 	/*
 	 * Define the placement constraint for the inline asm directive below.
@@ -518,6 +523,18 @@ void notrace cpu_init(void)
 
 u32 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = MPIDR_INVALID };
 
+
+
+/* start driving : 2016. 04. 02. (토) 16:48:38 KST
+	name : daehee
+*/
+// 일단 여기까지는 멀티코어라도 CPU(=core) 하나만 돌고있다.
+// 그렇다면 어떻게 여러 코어가 있는줄 알고 코어 아이디 세팅을 하느냐?
+// CONFIG로 이미 몇개의 코어가 있다고 세팅을 하고 여길 들어온다.
+// 전원이 인가되는 순간 모든 코어가 똑같은 코드를 실행시키고 있는것이 아니고, 랜덤하게 하나의 코어만 실행이 되어 부팅이되고,
+// Secondary cores(즉, 나머지 코어들)은 지정된 섹션 부터 부팅이 되도록 한다.
+//
+// [참고]  : http://blog.daum.net/_blog/BlogTypeView.do?blogid=0US1s&articleno=100&_bloghome_menu=recenttext
 void __init smp_setup_processor_id(void)
 {
 	int i;
@@ -535,7 +552,9 @@ void __init smp_setup_processor_id(void)
 	 * using percpu variable early, for example, lockdep will
 	 * access percpu variable inside lock_release
 	 */
-	set_my_cpu_offset(0); // CPU 스택 간에 데이터 동기화를 위해서 함수를 호출. CPU 스택의 주소를 CP15(TP~~)에 박아넣음.
+	set_my_cpu_offset(0); // 코프로세서의 레지스터를 0으로 초기화 해주기 위함임.
+						  // CPU0을 넘겨주는것이 아님.!!
+
 
 	pr_info("Booting Linux on physical CPU 0x%x\n", mpidr);
 }
@@ -649,7 +668,7 @@ static void __init setup_processor(void)
 	
 	/* 2016. 03. 12. (토) 21:51:16 KST */
 	/* TODO : MULTI_CPU why */
-	// 이유 : 부팅때 부터 core 여러개가 한꺼번에 돌기 때문에.
+	// 이유 : MULYI_CPU = MULTI_CORE
 
 	pr_info("CPU: %s [%08x] revision %d (ARMv%s), cr=%08lx\n",
 		cpu_name, read_cpuid_id(), read_cpuid_id() & 15,
@@ -942,14 +961,20 @@ void __init setup_arch(char **cmdline_p)
 {
 	const struct machine_desc *mdesc;
 
-	setup_processor(); // 현재까지 Core 1개가 돔.
+	setup_processor(); // 현재까지 Core 1개가 돌고있음.
 	mdesc = setup_machine_fdt(__atags_pointer); // flatted_device_tree 설정
 	if (!mdesc) // device_tree 가 없는 경우에 atag로 설정
 		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
+// 여기까지 옴으로써 머신 확정.!
 	machine_desc = mdesc;
 	machine_name = mdesc->name;
 	dump_stack_set_arch_desc("%s", mdesc->name);
 
+
+	/* end driving : 2016. 04. 02. (토) 21:55:47 KST
+	   name : daehee
+    */
+	// reboot 이 어떻게 되는걸까?
 	if (mdesc->reboot_mode != REBOOT_HARD)
 		reboot_mode = mdesc->reboot_mode;
 
@@ -1159,6 +1184,3 @@ static void c_stop(struct seq_file *m, void *v)
 }
 
 const struct seq_operations cpuinfo_op = {
-	.start	= c_start,
-	.next	= c_next,
-	.stop	= c_stop,

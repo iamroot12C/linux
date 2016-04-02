@@ -3038,7 +3038,20 @@ void __init dump_stack_set_arch_desc(const char *fmt, ...)
 {
 	va_list args;
 
-	va_start(args, fmt);
+	va_start(args, fmt);	// printf("adasdsd %d %s asdasd", a, b); 가 있을 때
+							// printf안의 "" 자체가 fmt 이고, 스택에
+							/* +----+
+							   | b  |
+							   +----+
+							   | a  |
+							   +----+
+							   |fmt |
+							   +----+
+							     ...
+							   +----+
+							   | ...|
+							*/
+							// 같이 저장되어 있다.
 	vsnprintf(dump_stack_arch_desc_str, sizeof(dump_stack_arch_desc_str),
 		  fmt, args);
 	va_end(args);

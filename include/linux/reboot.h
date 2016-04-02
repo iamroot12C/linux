@@ -11,11 +11,11 @@
 #define SYS_POWER_OFF	0x0003	/* Notify of system power off */
 
 enum reboot_mode {
-	REBOOT_COLD = 0,
-	REBOOT_WARM,
-	REBOOT_HARD,
-	REBOOT_SOFT,
-	REBOOT_GPIO,
+	REBOOT_COLD = 0,	// 일반적인 파워 온/오프, 전원버튼 누르는거
+	REBOOT_WARM,		// 와치독에 의해서 재부팅되는거,일부HW를 리셋에 제외
+	REBOOT_HARD,		// 칩에 연결된 하드웨어 리셋, PC에서 리셋버튼
+	REBOOT_SOFT,		// SW에 의한 리셋, ctrl+alt+del
+	REBOOT_GPIO,		// GPIO 시그널에의한 리셋
 };
 extern enum reboot_mode reboot_mode;
 

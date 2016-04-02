@@ -212,12 +212,15 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
 
 	mdesc_best = &__mach_desc_GENERIC_DT; //위에서 DT_MACHINE_START 에서 설정한 값을 mdesc_best 에다가 setting
 #endif
-
+	// boot/head.S 에서 넘겨주었던 atags_pointer를 넘겨준다.
 	if (!dt_phys || !early_init_dt_verify(phys_to_virt(dt_phys))) // 주소가 존재하지 않거나, device tree 가 존재하지 않으면, 즉 DTB가 없으면 NULL을 반환
 		return NULL;
 
+	// boot/head.S에서 가져온 atgs_pointer와 맞는 디바이스 매칭한다. 디바이스 트리에서 맞는거를 찾는다.
 	mdesc = of_flat_dt_match_machine(mdesc_best, arch_get_next_mach);
 
+	// multi platform 이면 절대 여기를 들어가지 않는다.
+	// why??
 	if (!mdesc) { // dtb가 없는 경우(커널 모듈과 드라이버 모듈이 mismatch)
 		const char *prop;
 		int size;
