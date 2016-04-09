@@ -412,11 +412,13 @@ static noinline void __init_refok rest_init(void)
 /* Check for early params. */
 static int __init do_early_param(char *param, char *val, const char *unused)
 {
+	// parameter 에 대응하는 handler를 등록해주는 함수.
 	const struct obs_kernel_param *p;
-
+	// setup_param = early 의 값을 0으로 줌 
+	// early_console 의 의미 : console이 커널에서 초기화가 안되도, 로그메시지 등을 console창에 띄워주기 위해 초기화.
 	for (p = __setup_start; p < __setup_end; p++) {
 		if ((p->early && parameq(param, p->str)) ||
-		    (strcmp(param, "console") == 0 &&
+		    (strcmp(param,"console") == 0 &&
 		     strcmp(p->str, "earlycon") == 0)
 		) {
 			if (p->setup_func(val) != 0)
@@ -429,21 +431,21 @@ static int __init do_early_param(char *param, char *val, const char *unused)
 
 void __init parse_early_options(char *cmdline)
 {
-	parse_args("early options", cmdline, NULL, 0, 0, 0, do_early_param);
+	parse_args("early options", cmdline, NULL, 0, 0, 0, do_early_param); // option에 따라서 파싱.
 }
 
 /* Arch code calls this early on, or if not, just before other parsing. */
 void __init parse_early_param(void)
 {
-	static int done __initdata;
+	static int done __initdata; // 미리 boot command 가 파싱되어 setting 되었는지 확인하는 플래그 변수.
 	static char tmp_cmdline[COMMAND_LINE_SIZE] __initdata;
 
-	if (done)
+	if (done) // 이전에 'done' 변수가 setting이 되어 있으면은 종료.
 		return;
 
 	/* All fall through to do_early_param. */
-	strlcpy(tmp_cmdline, boot_command_line, COMMAND_LINE_SIZE);
-	parse_early_options(tmp_cmdline);
+	strlcpy(tmp_cmdline, boot_command_line, COMMAND_LINE_SIZE); // parsing때 사용하는 임시변수에 복사.
+	parse_early_options(tmp_cmdline); // 파싱하는 함수.
 	done = 1;
 }
 

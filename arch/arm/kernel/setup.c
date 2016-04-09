@@ -974,23 +974,37 @@ void __init setup_arch(char **cmdline_p)
 	/* end driving : 2016. 04. 02. (토) 21:55:47 KST
 	   name : daehee
     */
-	// reboot 이 어떻게 되는걸까?
+	// reboot 이 어떻게 되는걸까???????????
 	if (mdesc->reboot_mode != REBOOT_HARD)
 		reboot_mode = mdesc->reboot_mode;
 
-	init_mm.start_code = (unsigned long) _text;
-	init_mm.end_code   = (unsigned long) _etext;
-	init_mm.end_data   = (unsigned long) _edata;
-	init_mm.brk	   = (unsigned long) _end;
+
+/* 2016. 04. 09. (토) 15:53:07 KST
+ * name : sim man seop
+ * start driving....
+ * */ 
+	// init_mm 은 swapper(idle) process의 영역을 저장.
+	init_mm.start_code = (unsigned long) _text; // kernel 코드 영역의 시작 주소를 저장
+	init_mm.end_code   = (unsigned long) _etext; // kernel 코드 영역의 끝 주소를 저장
+	init_mm.end_data   = (unsigned long) _edata; // kernel 데이터 영역의 끝 부분 
+	init_mm.brk	   = (unsigned long) _end; // bss 영역의 끝 주소, heap 영역의 시작 주소를 저장
 
 	/* populate cmd_line too for later use, preserving boot_command_line */
-	strlcpy(cmd_line, boot_command_line, COMMAND_LINE_SIZE);
-	*cmdline_p = cmd_line;
+	strlcpy(cmd_line, boot_command_line, COMMAND_LINE_SIZE); // 부트 명령어를 커멘드 라인 버퍼에 복사.
+															 // 부트 명령어는 atag_parse 에서 복사.
+	*cmdline_p = cmd_line;  // 반환할 커멘드 라인 버퍼의 포인터 주소를 넣어줌.
 
-	parse_early_param();
+	parse_early_param(); // 파라미터 파싱하는 부분
 
-	early_paging_init(mdesc, lookup_processor_type(read_cpuid_id()));
-	setup_dma_zone(mdesc);
+	early_paging_init(mdesc, lookup_processor_type(read_cpuid_id())); // 이 부분은 넘어갑니다.
+																	  // 자세한 내용은 문c블로그를 참조하세요.
+	setup_dma_zone(mdesc); // dma 영역 지정하는 부분.
+
+/*2016. 04. 09. (토) 20:47:20 KST
+ * End driving
+ * shim man seop
+ * TODO : memblock 자료구조와 관련 함수 공부해오기.
+*/
 	sanity_check_meminfo();
 	arm_memblock_init(mdesc);
 

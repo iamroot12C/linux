@@ -23,6 +23,8 @@
 /* Definition of memblock flags. */
 #define MEMBLOCK_HOTPLUG	0x1	/* hotpluggable region */
 
+
+// Physical Memory Block == 부팅타임때만 임시로 사용하는 메모리 할당 자료구조
 struct memblock_region {
 	phys_addr_t base;
 	phys_addr_t size;
@@ -41,9 +43,9 @@ struct memblock_type {
 
 struct memblock {
 	bool bottom_up;  /* is bottom up direction? */
-	phys_addr_t current_limit;
-	struct memblock_type memory;
-	struct memblock_type reserved;
+	phys_addr_t current_limit; // 메모리 제한
+	struct memblock_type memory; // 메모리?
+	struct memblock_type reserved; // 예약 메모리 영역?
 #ifdef CONFIG_HAVE_MEMBLOCK_PHYS_MAP
 	struct memblock_type physmem;
 #endif
@@ -351,11 +353,12 @@ static inline unsigned long memblock_region_reserved_end_pfn(const struct memblo
 	return PFN_UP(reg->base + reg->size);
 }
 
+// memblock_type -> region 들의 집합, region : iterator
 #define for_each_memblock(memblock_type, region)					\
 	for (region = memblock.memblock_type.regions;				\
 	     region < (memblock.memblock_type.regions + memblock.memblock_type.cnt);	\
 	     region++)
-
+		// memblock_type.cnt == memblock 개수.
 
 #ifdef CONFIG_ARCH_DISCARD_MEMBLOCK
 #define __init_memblock __meminit

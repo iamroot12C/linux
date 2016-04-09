@@ -128,7 +128,7 @@ static int parse_one(char *param,
 
 	if (handle_unknown) {
 		pr_debug("doing %s: %s='%s'\n", doing, param, val);
-		return handle_unknown(param, val, doing);
+		return handle_unknown(param, val, doing); // do_early_param in parse_args
 	}
 
 	pr_debug("Unknown argument '%s'\n", param);
@@ -143,14 +143,15 @@ static char *next_arg(char *args, char **param, char **val)
 	int in_quote = 0, quoted = 0;
 	char *next;
 
-	if (*args == '"') {
+	if (*args == '"') { // 따옴표 제거 
 		args++;
 		in_quote = 1;
 		quoted = 1;
 	}
-
-	for (i = 0; args[i]; i++) {
-		if (isspace(args[i]) && !in_quote)
+	for (i = 0; args[i]; i++) { // 첫번째 '='가 들어간 부분을 찾음. 
+		// 공백이 존재하고 '"'가 없으면 break
+		// '"' 안에 있는 공백은 일단 가져감.(공백이 포함된 옵션이 있을 수 있음.)
+		if (isspace(args[i]) && !in_quote) 
 			break;
 		if (equals == 0) {
 			if (args[i] == '=')
@@ -160,14 +161,15 @@ static char *next_arg(char *args, char **param, char **val)
 			in_quote = !in_quote;
 	}
 
+	// '=' 다음부터 공백이 나올때 까지의 값을 val에다 넣어 줌.
 	*param = args;
-	if (!equals)
+	if (!equals) // equal이 없으면 NULL 로 초기화
 		*val = NULL;
-	else {
+	else { //
 		args[equals] = '\0';
-		*val = args + equals + 1;
+		*val = args + equals + 1; // val에다 quote부분 (즉, 부트파라미터에서 지정한 변수) 을 넣어줌 
 
-		/* Don't include quotes in value. */
+		/* Don't include quotes in value. */ // 값만 넣어줌 ('"' 미포함)
 		if (**val == '"') {
 			(*val)++;
 			if (args[i-1] == '"')
@@ -184,10 +186,19 @@ static char *next_arg(char *args, char **param, char **val)
 		next = args + i;
 
 	/* Chew up trailing spaces. */
-	return skip_spaces(next);
+	return skip_spaces(next); // 파싱된 string을 앞부분의 공백을 제거하여 반환
 }
 
 /* Args looks like "foo=bar,bar2 baz=fuz wiz". */
+// parse_args("early options", cmdline, NULL, 0, 0, 0, do_early_param);
+// doing : "early option"
+// param : NULL
+// args : cmdline
+// num : NULL
+// min_level,max_level = 0
+// (*unknown) : do_early_param
+// ex param : BOOT_IMAGE=/boot/vmlinuz-3.16.0-30-generic root=UUID=acfbd210-21b2-441a-a00f-5ac54e1ce86a ro text
+
 char *parse_args(const char *doing,
 		 char *args,
 		 const struct kernel_param *params,
@@ -199,31 +210,37 @@ char *parse_args(const char *doing,
 	char *param, *val;
 
 	/* Chew leading spaces */
-	args = skip_spaces(args);
+	args = skip_spaces(args);  // trim 함수의 역할과 비슷함(하지만 이 함수는 앞부분의 공백만을 제거함)
 
 	if (*args)
 		pr_debug("doing %s, parsing ARGS: '%s'\n", doing, args);
-
+	
 	while (*args) {
 		int ret;
 		int irq_was_disabled;
-
+		//'"' 단위로 잘라줌
 		args = next_arg(args, &param, &val);
 		/* Stop at -- */
 		if (!val && strcmp(param, "--") == 0)
 			return args;
-		irq_was_disabled = irqs_disabled();
+		irq_was_disabled = irqs_disabled(); // inttrupt가 disable 되었는지 확인하는 함수.
+		// parse_args("early options", cmdline, NULL, 0, 0, 0, do_early_param);
+		// doing : "early option"
+		// args : cmdline
+		// num : NULL
+		// min_level,max_level = 0
+		// (*unknown) : do_early_param
 		ret = parse_one(param, val, doing, params, num,
-				min_level, max_level, unknown);
+				min_level, max_level, unknown); // 일단 skip
 		if (irq_was_disabled && !irqs_disabled())
 			pr_warn("%s: option '%s' enabled irq's!\n",
 				doing, param);
 
 		switch (ret) {
-		case -ENOENT:
+		case -ENOENT: // No Search File or directory
 			pr_err("%s: Unknown parameter `%s'\n", doing, param);
 			return ERR_PTR(ret);
-		case -ENOSPC:
+		case -ENOSPC: // /* No space left on device */
 			pr_err("%s: `%s' too large for parameter `%s'\n",
 			       doing, val ?: "", param);
 			return ERR_PTR(ret);

@@ -1037,6 +1037,8 @@ void __init debug_ll_io_init(void)
 
 static void * __initdata vmalloc_min =
 	(void *)(VMALLOC_END - (240 << 20) - VMALLOC_OFFSET);
+// ff000000 == 400MB, (240<<20) == 240MB, VMALLOC_OFFSET == 8MB
+// initdata vmalloc_min = 152MB
 
 /*
  * vmalloc=size forces the vmalloc area to be exactly 'size'
@@ -1070,8 +1072,8 @@ void __init sanity_check_meminfo(void)
 {
 	phys_addr_t memblock_limit = 0;
 	int highmem = 0;
-	phys_addr_t vmalloc_limit = __pa(vmalloc_min - 1) + 1;
-	struct memblock_region *reg;
+	phys_addr_t vmalloc_limit = __pa(vmalloc_min - 1) + 1; 
+	struct memblock_region *reg; // 자세한 내용은 memblock_region 내부를 참조!
 
 	for_each_memblock(memory, reg) {
 		phys_addr_t block_start = reg->base;
@@ -1395,6 +1397,7 @@ static void __init map_lowmem(void)
 void __init early_paging_init(const struct machine_desc *mdesc,
 			      struct proc_info_list *procinfo)
 {
+
 	pmdval_t pmdprot = procinfo->__cpu_mm_mmu_flags;
 	unsigned long map_start, map_end;
 	pgd_t *pgd0, *pgdk;
@@ -1403,7 +1406,7 @@ void __init early_paging_init(const struct machine_desc *mdesc,
 	phys_addr_t phys;
 	int i;
 
-	if (!(mdesc->init_meminfo))
+	if (!(mdesc->init_meminfo)) // init_meminfo 가 NULL인 경우에 나감.
 		return;
 
 	/* remap kernel code and data */
@@ -1498,11 +1501,11 @@ void __init early_paging_init(const struct machine_desc *mdesc,
 }
 
 #else
-
+// 여기를 탑니다(early_paging_init)...
 void __init early_paging_init(const struct machine_desc *mdesc,
 			      struct proc_info_list *procinfo)
 {
-	if (mdesc->init_meminfo)
+	if (mdesc->init_meminfo) // arch/arm/mach-keystone/keystone.c
 		mdesc->init_meminfo();
 }
 

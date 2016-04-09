@@ -172,13 +172,15 @@ static void __init arm_adjust_dma_zone(unsigned long *size, unsigned long *hole,
 
 void __init setup_dma_zone(const struct machine_desc *mdesc)
 {
+// DMA_ZONE 영역의 크기를 지정해주는 부분.
 #ifdef CONFIG_ZONE_DMA
-	if (mdesc->dma_zone_size) {
-		arm_dma_zone_size = mdesc->dma_zone_size;
-		arm_dma_limit = PHYS_OFFSET + arm_dma_zone_size - 1;
+	if (mdesc->dma_zone_size) { 
+		arm_dma_zone_size = mdesc->dma_zone_size; // 아키텍쳐에 따라서 dma_zone을 다르게 잡아줌.
+		arm_dma_limit = PHYS_OFFSET + arm_dma_zone_size - 1; // 주소 보정, 커널의 시작주소+dma_size 로 잡음.
+														     // DMA는 커널의 시작주소에서 시작된다.
 	} else
-		arm_dma_limit = 0xffffffff;
-	arm_dma_pfn_limit = arm_dma_limit >> PAGE_SHIFT;
+		arm_dma_limit = 0xffffffff; // size를 명시하지 않는 경우, 4GB영역 전체를 limit로 정함
+	arm_dma_pfn_limit = arm_dma_limit >> PAGE_SHIFT; // PAGE_SHIFT(페이지 크기) = 12 --> 2^12=4096 으로 나누어줌.
 #endif
 }
 

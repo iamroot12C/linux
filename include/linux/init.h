@@ -252,13 +252,17 @@ struct obs_kernel_param {
  * Force the alignment so the compiler doesn't space elements of the
  * obs_kernel_param "array" too far apart in .init.setup.
  */
+// architecture에 맞춰서 실제 obs_kernel_param __setup_##unique_id를 실제로 정의
+// 다시말해 parameter 에 해당하는 handler 등록부분
 #define __setup_param(str, unique_id, fn, early)			\
 	static const char __setup_str_##unique_id[] __initconst	\
 		__aligned(1) = str; \
 	static struct obs_kernel_param __setup_##unique_id	\
-		__used __section(.init.setup)			\
+		__used __section(.init.setup)			\ 
 		__attribute__((aligned((sizeof(long)))))	\
 		= { __setup_str_##unique_id, fn, early }
+		/*.init.setup section 에 실제로 맞춰줌*/
+		/*alignment 도 맞춰줌.*/
 
 #define __setup(str, fn)					\
 	__setup_param(str, fn, fn, 0)
