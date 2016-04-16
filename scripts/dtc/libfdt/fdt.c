@@ -84,7 +84,7 @@ const void *fdt_offset_ptr(const void *fdt, int offset, unsigned int len)
 		    || ((offset + len) > fdt_size_dt_struct(fdt)))
 			return NULL;
 
-	p = _fdt_offset_ptr(fdt, offset);
+	p = _fdt_offset_ptr(fdt, offset);	// structure block + offset을 가리키게 된다.
 
 	if (p + len < p)
 		return NULL;
@@ -92,20 +92,42 @@ const void *fdt_offset_ptr(const void *fdt, int offset, unsigned int len)
 }
 
 uint32_t fdt_next_tag(const void *fdt, int startoffset, int *nextoffset)
+//											0					0					
 {
 	const uint32_t *tagp, *lenp;
 	uint32_t tag;
 	int offset = startoffset;
 	const char *p;
 
-	*nextoffset = -FDT_ERR_TRUNCATED;
-	tagp = fdt_offset_ptr(fdt, offset, FDT_TAGSIZE);
+	*nextoffset = -FDT_ERR_TRUNCATED;	// -8
+	tagp = fdt_offset_ptr(fdt, offset, FDT_TAGSIZE/*=4*/);
 	if (!tagp)
 		return FDT_END; /* premature end */
-	tag = fdt32_to_cpu(*tagp);
-	offset += FDT_TAGSIZE;
+	tag = fdt32_to_cpu(*tagp);	// tagp는 주소고, 그 주소를 따라가면 값이 있고 그 값이 tag에 저장된다.
+								// 아마도 맨 처음에는 1이 저장되어 있을 것 같음. 그다음부터 4바이트 마다 숫자들이 저장되어 있을것같음.
+	offset += FDT_TAGSIZE;	//0+4 가 되었다.
 
-	*nextoffset = -FDT_ERR_BADSTRUCTURE;
+	*nextoffset = -FDT_ERR_BADSTRUCTURE;	// 여기서 부터 오류나면 베드스트럭쳐 오류.!
+											// 하나의 노드에 대해서 태그를 붙이는 거다.!
+											/*
+											   aliases {
+											             serial0 = &v2m_serial0;
+												         serial1 = &v2m_serial1;
+												         serial2 = &v2m_serial2;
+												         serial3 = &v2m_serial3;
+												         i2c0 = &v2m_i2c_dvi;
+												         i2c1 = &v2m_i2c_pcie;
+												};
+
+												디바이스트리파일에 이렇게 되어있는데,
+												aliases = FDT_BEGIN_NODE
+												serial0... = FDT_PROPERTY
+												}; = FDT_END_NODE
+
+												인것이다.
+
+												전체 디바이스트리의 노드들에 대한 태그가 아니다.!
+											*/
 	switch (tag) {
 	case FDT_BEGIN_NODE:
 		/* skip name */
@@ -116,7 +138,11 @@ uint32_t fdt_next_tag(const void *fdt, int startoffset, int *nextoffset)
 			return FDT_END; /* premature end */
 		break;
 
-	case FDT_PROP:
+	case FDT_PROP:													// +------------------------------------------------------------------+
+																	// | struct fdt_node_header | struct fdt_property | ... 
+																	// | tag : BEGIN_NODE		| tag : FDT_PROP	  |
+																	// | data : name이 들어감	| lengs : 0x???		  |																								  // |						  | nameoff : 프로퍼티의 name 주소값
+																	// |						| data : 프로퍼티 값 자체가 들어감
 		lenp = fdt_offset_ptr(fdt, offset, sizeof(*lenp));
 		if (!lenp)
 			return FDT_END; /* premature end */
@@ -170,9 +196,9 @@ int fdt_next_node(const void *fdt, int offset, int *depth)
 
 	do {
 		offset = nextoffset;
-		tag = fdt_next_tag(fdt, offset, &nextoffset);
+		tag = fdt_next_tag(fdt, offset, &nextoffset);	// 안에 들어가면 이해가 될거에요.
 
-		switch (tag) {
+		switch (tag) {	// 찾은 tag를 이용하여 depth가 지정되겠죠, BEGIN 다음ㅇ[ㅔ END가 나오면 뎁스가 없겠지만, 또 BEGIN이 나오면 자식이 있다는 소라ㅣ니까 뎁스가 있겠져.
 		case FDT_PROP:
 		case FDT_NOP:
 			break;

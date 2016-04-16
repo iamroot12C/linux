@@ -559,7 +559,7 @@ asmlinkage __visible void __init start_kernel(void)
 
 	page_address_init();		// defined(CONFIG_HIGHMEM) && !defined(WANT_PAGE_VIRTUAL) 경우 L1 캐쉬 바이트 초기화
 	pr_notice("%s", linux_banner);
-	setup_arch(&command_line);
+	setup_arch(&command_line); // ~ing ...
 	mm_init_cpumask(&init_mm);
 	setup_command_line(command_line);
 	setup_nr_cpu_ids();

@@ -1,5 +1,7 @@
 /dts-v1/;
 /include/ "bcm2835-rpi.dtsi"
+/* include할때 원래 이게 문법이고, #include는 나중에 지원한것.
+   */
 
 / {
 	compatible = "raspberrypi,model-b", "brcm,bcm2835";

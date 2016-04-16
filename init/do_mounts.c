@@ -592,7 +592,11 @@ void __init prepare_namespace(void)
 	mount_root();
 out:
 	devtmpfs_mount("dev");
-	sys_mount(".", "/", NULL, MS_MOVE, NULL);
+	sys_mount(".", "/", NULL, MS_MOVE, NULL);	// 현재 디렉토리에서 "/"밑으로 무브하라.!
+												// 아~ "/root/"에 마운트 했다가 여기서 "/"에 마운트 하는구나.
+												// 그래서 $ls /root 하면 아무것도 안보인다. 당연한게 "/"로 리마운트 했으니까.!
+												// 그래서 "/root" 가 존재하는거였어요.!!	
+												// 나중에 다시봐야 재밌을것같아요,
 	sys_chroot(".");
 }
 

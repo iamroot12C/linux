@@ -154,7 +154,7 @@ void memzero_explicit(void *s, size_t count);
  */
 static inline const char *kbasename(const char *path)
 {
-	const char *tail = strrchr(path, '/');
+	const char *tail = strrchr(path, '/');	// &path 뒤에서부터 '/'의 포인터를 찾아온다.
 	return tail ? tail + 1 : path;
 }
 

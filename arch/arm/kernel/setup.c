@@ -1005,6 +1005,11 @@ void __init setup_arch(char **cmdline_p)
  * shim man seop
  * TODO : memblock 자료구조와 관련 함수 공부해오기.
 */
+
+/* 2016. 04. 16. (토) 15:03:31 KST
+   start driving
+	name : daehee
+*/
 	sanity_check_meminfo();
 	arm_memblock_init(mdesc);
 

@@ -433,7 +433,7 @@ EXPORT_SYMBOL_GPL(of_fdt_unflatten_tree);
 int __initdata dt_root_addr_cells;
 int __initdata dt_root_size_cells;
 
-void *initial_boot_params;
+void *initial_boot_params;	// 현재 device tree의 가상주소를 가지고 있음.
 
 #ifdef CONFIG_OF_EARLY_FLATTREE
 
@@ -592,7 +592,7 @@ int __init of_scan_flat_dt(int (*it)(unsigned long node,
 				     void *data),
 			   void *data)
 {
-	const void *blob = initial_boot_params;
+	const void *blob = initial_boot_params;	// device tree의 가상주소
 	const char *pathp;
 	int offset, rc = 0, depth = -1;
 
@@ -600,11 +600,11 @@ int __init of_scan_flat_dt(int (*it)(unsigned long node,
              offset >= 0 && depth >= 0 && !rc;
              offset = fdt_next_node(blob, offset, &depth)) {
 
-		pathp = fdt_get_name(blob, offset, NULL);
-		if (*pathp == '/')
-			pathp = kbasename(pathp);
-		rc = it(offset, pathp, depth, data);
-	}
+				pathp = fdt_get_name(blob, offset, NULL);
+				if (*pathp == '/')
+					pathp = kbasename(pathp);	// 루트 다음으로 넘겨주는거.
+				rc = it(offset, pathp, depth, data);	// 가져온 함수 포인터를 실행하지요,!
+		}
 	return rc;
 }
 
@@ -723,7 +723,9 @@ const void * __init of_flat_dt_match_machine(const void *default_match,
 	return best_data; // 찾은 Data를 반환
 }
 
-#ifdef CONFIG_BLK_DEV_INITRD
+#ifdef CONFIG_BLK_DEV_INITRD	// RAM DISK? - ram을 디스크처럼 쓰는거다.
+								// initrd는 부팅 할 때 쓰는 부트파일시스템 같은 거.
+								// 디바이스 마다 다르다. initrd를 쓰는 녀석은 이걸 탄다.!!
 /**
  * early_init_dt_check_for_initrd - Decode initrd location from flat tree
  * @node: reference to node containing initrd location ('chosen')
@@ -901,6 +903,8 @@ int __init early_init_dt_scan_memory(unsigned long node, const char *uname,
 
 int __init early_init_dt_scan_chosen(unsigned long node, const char *uname,
 				     int depth, void *data)
+//											현재 노드 offset, 경로
+//						깊이, 	boot_command_line
 {
 	int l;
 	const char *p;
@@ -911,7 +915,19 @@ int __init early_init_dt_scan_chosen(unsigned long node, const char *uname,
 	    (strcmp(uname, "chosen") != 0 && strcmp(uname, "chosen@0") != 0))
 		return 0;
 
-	early_init_dt_check_for_initrd(node);
+	early_init_dt_check_for_initrd(node);	// 우리는 initrd가 무엇인지 알아가고 있습니다.
+											// init프로세스를 띄우기위해 RFS(root file system)을 마운트 해서 RFS안의 sbin/init을 띄워야되는데
+											// initrd는 램디스크를 이용해 RFS를 마운트 합니다.
+											// 이때 initrd에는 init프로세스를 띄우기 위한 스크립트 등의 정보들이 들어있고, 이로인해
+											// 필요한 정보들만 올라가게 됩니다.
+											// 나중에 init프로세스가 띄워지고 나머지를 마운트 합니다.
+											// but,
+											// 좀 더 구체적으로 봐야함.
+
+	/* 2016. 04. 16. (토) 21:56:27 KST
+	   end driving
+		name : daehee
+	 */
 
 	/* Retrieve command line */
 	p = of_get_flat_dt_prop(node, "bootargs", &l);
