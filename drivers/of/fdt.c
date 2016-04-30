@@ -847,8 +847,16 @@ int __init early_init_dt_scan_root(unsigned long node, const char *uname,
 u64 __init dt_mem_next_cell(int s, const __be32 **cellp)
 {
 	const __be32 *p = *cellp;
-
-	*cellp = p + s;
+	/*
+	 * *reg
+	 * |  0  |  0x10000000  |
+	 * 0     1              2
+	 *
+	 * *p => reg
+	 * *cellp => reg
+	 * **cellp => &reg
+	 */
+	*cellp = p + s;	// *cellp (0 => 1)
 	return of_read_number(p, s);
 }
 
@@ -858,11 +866,21 @@ u64 __init dt_mem_next_cell(int s, const __be32 **cellp)
 int __init early_init_dt_scan_memory(unsigned long node, const char *uname,
 				     int depth, void *data)
 {
+	/**
+	 ** 2016. 04. 30. (토) 16:25:31 KST
+	 ** Begin
+	 ** Driver: Shin Eunhwan
+	 **/
 	const char *type = of_get_flat_dt_prop(node, "device_type", NULL);
 	const __be32 *reg, *endp;
 	int l;
 
 	/* We are scanning "memory" nodes only */
+	/* 
+	 * Check the file below.
+	 * skeleton.dtsi
+	 * memory { device_type = "memory"; reg = <0 0>; };
+	 */
 	if (type == NULL) {
 		/*
 		 * The longtrail doesn't have a device_type on the
@@ -879,6 +897,12 @@ int __init early_init_dt_scan_memory(unsigned long node, const char *uname,
 	if (reg == NULL)
 		return 0;
 
+	/*
+	 * bcm2835-rpi.dtsi
+	 * memory {
+	 *   reg = <0 0x10000000>; => 256M
+	 * };
+	 */
 	endp = reg + (l / sizeof(__be32));
 
 	pr_debug("memory scan node %s, reg size %d, data: %x %x %x %x,\n",
@@ -887,6 +911,9 @@ int __init early_init_dt_scan_memory(unsigned long node, const char *uname,
 	while ((endp - reg) >= (dt_root_addr_cells + dt_root_size_cells)) {
 		u64 base, size;
 
+		/*
+		 * check dt_mem_next_cell()
+		 */
 		base = dt_mem_next_cell(dt_root_addr_cells, &reg);
 		size = dt_mem_next_cell(dt_root_size_cells, &reg);
 
@@ -957,10 +984,10 @@ int __init early_init_dt_scan_chosen(unsigned long node, const char *uname,
 
 void __init __weak early_init_dt_add_memory_arch(u64 base, u64 size)
 {
-	const u64 phys_offset = __pa(PAGE_OFFSET);
+	const u64 phys_offset = __pa(PAGE_OFFSET);	// PAGE_OFFSET: 0xC0000000
 
-	if (!PAGE_ALIGNED(base)) {
-		if (size < PAGE_SIZE - (base & ~PAGE_MASK)) {
+	if (!PAGE_ALIGNED(base)) {	// check if page is aligned or not (4K)
+		if (size < PAGE_SIZE - (base & ~PAGE_MASK)) {	// if (size < 0~4095) {, (base & ~PAGE_MASK); check if any bits in lower 12bit is enable
 			pr_warn("Ignoring memory block 0x%llx - 0x%llx\n",
 				base, base + size);
 			return;
@@ -968,8 +995,9 @@ void __init __weak early_init_dt_add_memory_arch(u64 base, u64 size)
 		size -= PAGE_SIZE - (base & ~PAGE_MASK);
 		base = PAGE_ALIGN(base);
 	}
-	size &= PAGE_MASK;
+	size &= PAGE_MASK;	// clear lower 12 bits
 
+	/* below if statements are memory sanity check routines */
 	if (base > MAX_PHYS_ADDR) {
 		pr_warning("Ignoring memory block 0x%llx - 0x%llx\n",
 				base, base + size);

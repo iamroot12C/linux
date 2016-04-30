@@ -448,6 +448,7 @@ static void __init_memblock memblock_merge_regions(struct memblock_type *type)
 		memmove(next, next + 1, (type->cnt - (i + 2)) * sizeof(*next));
 		type->cnt--;
 	}
+	// loop only once for the first region
 }
 
 /**
@@ -526,14 +527,14 @@ repeat:
 	base = obase;
 	nr_new = 0;
 
-	for (i = 0; i < type->cnt; i++) {
+	for (i = 0; i < type->cnt; i++) {	// type->cnt=1
 		struct memblock_region *rgn = &type->regions[i];
-		phys_addr_t rbase = rgn->base;
-		phys_addr_t rend = rbase + rgn->size;
+		phys_addr_t rbase = rgn->base;			// rbase=0
+		phys_addr_t rend = rbase + rgn->size;	// rend=0x10000000
 
-		if (rbase >= end)
+		if (rbase >= end)	// end=0x10000000
 			break;
-		if (rend <= base)
+		if (rend <= base)	// base=0
 			continue;
 		/*
 		 * @rgn overlaps.  If it separates the lower part of new
@@ -547,13 +548,13 @@ repeat:
 						       flags);
 		}
 		/* area below @rend is dealt with, forget about it */
-		base = min(rend, end);
+		base = min(rend, end);	// base=0x10000000
 	}
 
 	/* insert the remaining portion */
-	if (base < end) {
+	if (base < end) {	// base=0x10000000, end=0x10000000
 		nr_new++;
-		if (insert)
+		if (insert)		// (1st loop) insert=false, (2nd loop) insert=true
 			memblock_insert_region(type, i, base, end - base,
 					       nid, flags);
 	}
@@ -562,8 +563,8 @@ repeat:
 	 * If this was the first round, resize array and repeat for actual
 	 * insertions; otherwise, merge and return.
 	 */
-	if (!insert) {
-		while (type->cnt + nr_new > type->max)
+	if (!insert) {	// false
+		while (type->cnt + nr_new > type->max)	// nr_new=0, type->max=128
 			if (memblock_double_array(type, obase, size) < 0)
 				return -ENOMEM;
 		insert = true;

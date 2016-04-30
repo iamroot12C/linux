@@ -1080,12 +1080,17 @@ void __init sanity_check_meminfo(void)
 		phys_addr_t block_end = reg->base + reg->size;
 		phys_addr_t size_limit = reg->size;
 
-		if (reg->base >= vmalloc_limit)
+		if (reg->base >= vmalloc_limit)	// vmalloc_limit=152M
 			highmem = 1;
 		else
-			size_limit = vmalloc_limit - reg->base;
+			size_limit = vmalloc_limit - reg->base;	// size_limit will decrease for each loop
 
 
+		/*
+		 * 2016. 04. 30. (토) 21:21:33 KST
+		 * End
+		 * Shin Eunhwan
+		 */
 		if (!IS_ENABLED(CONFIG_HIGHMEM) || cache_is_vipt_aliasing()) {
 
 			if (highmem) {
