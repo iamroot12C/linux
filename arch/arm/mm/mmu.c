@@ -1037,8 +1037,9 @@ void __init debug_ll_io_init(void)
 
 static void * __initdata vmalloc_min =
 	(void *)(VMALLOC_END - (240 << 20) - VMALLOC_OFFSET);
-// ff000000 == 400MB, (240<<20) == 240MB, VMALLOC_OFFSET == 8MB
-// initdata vmalloc_min = 152MB
+// VMALLOC_END = 0xff000000 , (240<<20) == 240MB, VMALLOC_OFFSET == 8MB
+// initdata vmalloc_min = 0xef800000
+// VMALLOC SIZE = 248MB
 
 /*
  * vmalloc=size forces the vmalloc area to be exactly 'size'
@@ -1072,36 +1073,48 @@ void __init sanity_check_meminfo(void)
 {
 	phys_addr_t memblock_limit = 0;
 	int highmem = 0;
-	phys_addr_t vmalloc_limit = __pa(vmalloc_min - 1) + 1; 
+	phys_addr_t vmalloc_limit = __pa(vmalloc_min - 1) + 1; // 0x6f800000(라즈베리 파이 2 기준)
 	struct memblock_region *reg; // 자세한 내용은 memblock_region 내부를 참조!
 
 	for_each_memblock(memory, reg) {
 		phys_addr_t block_start = reg->base;
 		phys_addr_t block_end = reg->base + reg->size;
 		phys_addr_t size_limit = reg->size;
-
-		if (reg->base >= vmalloc_limit)	// vmalloc_limit=152M
+		
+		// memblock_region 의 base 주소가 0x6f800000 보다 큰 경우 highmem.
+		if (reg->base >= vmalloc_limit)	// vmalloc_limit=0x6f800000
 			highmem = 1;
+		// 그렇지 않은 경우 size_limit를 변경한다.
 		else
-			size_limit = vmalloc_limit - reg->base;	// size_limit will decrease for each loop
-
+			size_limit = vmalloc_limit - reg->base;	// 루프 때 마다 size_limit이 바뀜.
 
 		/*
 		 * 2016. 04. 30. (토) 21:21:33 KST
 		 * End
 		 * Shin Eunhwan
 		 */
+
+		/*
+		 * 2016. 05. 07. (토) 19:12:29 KST
+		 * Start driving ...
+		 * Sim man seop
+		 * */
+
+		// highmem이 아니거나, d-cache가 vipt_aliasing()을 사용하는 경우.
 		if (!IS_ENABLED(CONFIG_HIGHMEM) || cache_is_vipt_aliasing()) {
 
 			if (highmem) {
 				pr_notice("Ignoring RAM at %pa-%pa (!CONFIG_HIGHMEM)\n",
 					  &block_start, &block_end);
-				memblock_remove(reg->base, reg->size);
+				memblock_remove(reg->base, reg->size); // vipt_aliasing()을 사용하고 highmem인 경우 highmem 부분을 삭제.
+													   // HIGHMEM 영역을 사용하지 않으면 커널의 가상주소와 물리주소는 항상 1:1 Mapping관계에 있으므로
+													   // aliasing(서로 다른 가상주소가 같은 물리주소를 가리키는 현상.)이 발생하지 않는다.
+													   // aliasing문제가 발생하면 캐시 일관성문제가 발생한다.
 				continue;
 			}
 
-			if (reg->size > size_limit) {
-				phys_addr_t overlap_size = reg->size - size_limit;
+			if (reg->size > size_limit) { // size가 lowmem부분을 넘어가는 만큼 HIGHMEM 윗 부분을 제거한다.
+				phys_addr_t overlap_size = reg->size - size_limit; // lowmem부분을 넘어가는 크기를 계산.
 
 				pr_notice("Truncating RAM at %pa-%pa to -%pa",
 					  &block_start, &block_end, &vmalloc_limit);
@@ -1109,12 +1122,13 @@ void __init sanity_check_meminfo(void)
 				block_end = vmalloc_limit;
 			}
 		}
-
-		if (!highmem) {
-			if (block_end > arm_lowmem_limit) {
-				if (reg->size > size_limit)
-					arm_lowmem_limit = vmalloc_limit;
-				else
+		// arm_lowmem_limit = 0, block_end = memblock의 마지막 주소(base + size)
+		if (!highmem) { 
+			if (block_end > arm_lowmem_limit) { // block_end(메모리)가 arm_lowmem_lit보다 큰 경우 arm_lowmem_limit을 update
+				if (reg->size > size_limit) // memblock 크기가 size_limit보다 큰 경우
+											// (블럭 사이즈가 lowmem 영역까지 남은 공간을 초과하는 경우 arm_lowmem_limit에 vmalloc_limit을 대입하고 그렇지 않은 경우 블럭의 끝을 지정)
+					arm_lowmem_limit = vmalloc_limit; 
+				else // 아닌 경우.
 					arm_lowmem_limit = block_end;
 			}
 
@@ -1131,11 +1145,12 @@ void __init sanity_check_meminfo(void)
 			 * allocated when mapping the start of bank 0, which
 			 * occurs before any free memory is mapped.
 			 */
-			if (!memblock_limit) {
-				if (!IS_ALIGNED(block_start, SECTION_SIZE))
-					memblock_limit = block_start;
+			if (!memblock_limit) { // memblock_limit이 setting되지 않은 경우
+				if (!IS_ALIGNED(block_start, SECTION_SIZE)) // 블록의 시작주소가 SECTION_SIZE 로 align 되지 않은 경우
+					memblock_limit = block_start; // 블록의 끝 주소가 SECTION_SIZE 로 align 되지 않은 경우
 				else if (!IS_ALIGNED(block_end, SECTION_SIZE))
 					memblock_limit = arm_lowmem_limit;
+				// 대입!
 			}
 
 		}
@@ -1149,11 +1164,11 @@ void __init sanity_check_meminfo(void)
 	 * last full section, which should be mapped.
 	 */
 	if (memblock_limit)
-		memblock_limit = round_down(memblock_limit, SECTION_SIZE);
-	if (!memblock_limit)
-		memblock_limit = arm_lowmem_limit;
+		memblock_limit = round_down(memblock_limit, SECTION_SIZE); // memblock_limit을 SECTION_SIZE 로 alignment해줌.
+	if (!memblock_limit) // memblock의 시작주소와 끝 주소가 SECTION_SIZE 로 align되있는 경우.
+		memblock_limit = arm_lowmem_limit; // memblock_limit을 arm_lowmem_limit으로 설정해줌.
 
-	memblock_set_current_limit(memblock_limit);
+	memblock_set_current_limit(memblock_limit); // memblock의 limit를 설정해줌
 }
 
 static inline void prepare_page_table(void)

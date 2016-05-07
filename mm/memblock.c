@@ -151,7 +151,7 @@ __memblock_find_range_top_down(phys_addr_t start, phys_addr_t end,
 {
 	phys_addr_t this_start, this_end, cand;
 	u64 i;
-
+	// 아직 할당되지 않은 memblock을 높은 index부터 차례로 순회하면서 아직 할당되지 않은 부분을 찾아서 return (rest fit algorithm과 유사한것 같음)
 	for_each_free_mem_range_reverse(i, nid, &this_start, &this_end, NULL) {
 		this_start = clamp(this_start, start, end);
 		this_end = clamp(this_end, start, end);
@@ -207,6 +207,7 @@ phys_addr_t __init_memblock memblock_find_in_range_node(phys_addr_t size,
 	 * try bottom-up allocation only when bottom-up mode
 	 * is set and @end is above the kernel image.
 	 */
+	// 이쪽 부분은 타지 않음.(ARM에서는 hotplug를 미지원하여 bottom_up() 방식의 메모리 할당을 시행하지 않음.)
 	if (memblock_bottom_up() && end > kernel_end) {
 		phys_addr_t bottom_up_start;
 
@@ -232,7 +233,7 @@ phys_addr_t __init_memblock memblock_find_in_range_node(phys_addr_t size,
 		WARN_ONCE(1, "memblock: bottom-up allocation failed, "
 			     "memory hotunplug may be affected\n");
 	}
-
+	// 이부분을 보면 됨.
 	return __memblock_find_range_top_down(start, end, size, align, nid);
 }
 
@@ -324,26 +325,28 @@ static int __init_memblock memblock_double_array(struct memblock_type *type,
 	struct memblock_region *new_array, *old_array;
 	phys_addr_t old_alloc_size, new_alloc_size;
 	phys_addr_t old_size, new_size, addr;
-	int use_slab = slab_is_available();
+	int use_slab = slab_is_available(); // slab 할당자를 사용 할 수 있는지 체크.
 	int *in_slab;
 
 	/* We don't allow resizing until we know about the reserved regions
 	 * of memory that aren't suitable for allocation
 	 */
-	if (!memblock_can_resize)
+	if (!memblock_can_resize) // resize가 꺼져있으면 종료.
 		return -1;
 
 	/* Calculate new doubled size */
 	old_size = type->max * sizeof(struct memblock_region);
-	new_size = old_size << 1;
+	new_size = old_size << 1; // new_size = old_size*2
 	/*
 	 * We need to allocated new one align to PAGE_SIZE,
 	 *   so we can free them completely later.
 	 */
-	old_alloc_size = PAGE_ALIGN(old_size);
+	// 메모리 align 맞춰주는 부분.
+	old_alloc_size = PAGE_ALIGN(old_size); 
 	new_alloc_size = PAGE_ALIGN(new_size);
 
 	/* Retrieve the slab flag */
+	// kfree()를 사용할지 memblock_free()를 사용할지 결정해주는 부분.
 	if (type == &memblock.memory)
 		in_slab = &memblock_memory_in_slab;
 	else
@@ -360,11 +363,14 @@ static int __init_memblock memblock_double_array(struct memblock_type *type,
 	 * call into MEMBLOCK while it's still active, or much later when slab
 	 * is active for memory hotplug operations
 	 */
+	// 2015.05 월 소스코드에서는 kfree를 사용하기에는 불안정하기 때문에 무조건 memblock_free()를 사용함.
 	if (use_slab) {
 		new_array = kmalloc(new_size, GFP_KERNEL);
 		addr = new_array ? __pa(new_array) : 0;
 	} else {
 		/* only exclude range when trying to double reserved.regions */
+		// memory type 인 경우 first-fit 알고리즘과 유사하게 (메모리의 처음부터 검색)을 이용하여 메모리를 할당해주고, 
+		// reserved type 인 경우 next-fix 알고리즘과 유사하게 (reserved 영역부터 검색)을 이용하여 메모리를 할당함.
 		if (type != &memblock.reserved)
 			new_area_start = new_area_size = 0;
 
@@ -393,13 +399,17 @@ static int __init_memblock memblock_double_array(struct memblock_type *type,
 	 * reserved region since it may be our reserved array itself that is
 	 * full.
 	 */
+	// 실제로 찾은 영역에 메모리를 할당해준다.
+	// 원래 영역과 새로운 영역을 swap
 	memcpy(new_array, type->regions, old_size);
+	// 새로 할당 받은 부분은 0으로 초기화.
 	memset(new_array + type->max, 0, old_size);
 	old_array = type->regions;
 	type->regions = new_array;
-	type->max <<= 1;
+	type->max <<= 1; // type->max = type->max * 2
 
 	/* Free old array. We needn't free it if the array is the static one */
+	// 전에 있던 old_array는 memblock_free를 이용하여 해제
 	if (*in_slab)
 		kfree(old_array);
 	else if (old_array != memblock_memory_init_regions &&
@@ -564,7 +574,7 @@ repeat:
 	 * insertions; otherwise, merge and return.
 	 */
 	if (!insert) {	// false
-		while (type->cnt + nr_new > type->max)	// nr_new=0, type->max=128
+		while (type->cnt + nr_new > type->max)	// nr_new=0, type->max=128,(128개(최대 개수)를 넘기지 않으면 타지 않음. 64bit일때 넘어감.)
 			if (memblock_double_array(type, obase, size) < 0)
 				return -ENOMEM;
 		insert = true;

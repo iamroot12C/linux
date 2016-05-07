@@ -1011,6 +1011,13 @@ void __init setup_arch(char **cmdline_p)
 	name : daehee
 */
 	sanity_check_meminfo();
+/*
+ *
+ * 2016. 05. 07. (토) 20:50:15 KST
+ * End driving..
+ * sim man seop
+ * 
+ * */
 	arm_memblock_init(mdesc);
 
 	paging_init(mdesc);

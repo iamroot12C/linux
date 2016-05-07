@@ -1021,6 +1021,8 @@ void __init __weak early_init_dt_add_memory_arch(u64 base, u64 size)
 		size -= phys_offset - base;
 		base = phys_offset;
 	}
+	// 기본 setting만 하고 함수 종료
+	// (memblock region 필드 초기화 만 하고 종료.)
 	memblock_add(base, size);
 }
 
