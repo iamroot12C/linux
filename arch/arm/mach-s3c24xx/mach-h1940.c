@@ -673,8 +673,8 @@ static void __init h1940_init_time(void)
 /* H1940 and RX3715 need to reserve this for suspend */
 static void __init h1940_reserve(void)
 {
-	memblock_reserve(0x30003000, 0x1000);
-	memblock_reserve(0x30081000, 0x1000);
+	memblock_reserve(0x30003000, 0x1000); // base,size 순서.
+	memblock_reserve(0x30081000, 0x1000); // base,size 순서.
 }
 
 static void __init h1940_init(void)

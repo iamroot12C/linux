@@ -363,7 +363,7 @@ static int __init_memblock memblock_double_array(struct memblock_type *type,
 	 * call into MEMBLOCK while it's still active, or much later when slab
 	 * is active for memory hotplug operations
 	 */
-	// 2015.05 월 소스코드에서는 kfree를 사용하기에는 불안정하기 때문에 무조건 memblock_free()를 사용함.
+	// 2015.05 월 소스코드에서는 kfree를 사용할 수 없기 때문에 무조건 memblock_free()를 사용함.
 	if (use_slab) {
 		new_array = kmalloc(new_size, GFP_KERNEL);
 		addr = new_array ? __pa(new_array) : 0;

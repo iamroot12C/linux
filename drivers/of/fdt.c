@@ -562,9 +562,18 @@ void __init early_init_fdt_scan_reserved_mem(void)
 		return;
 
 	/* Reserve the dtb region */
+	// boot_param = dtb 시작 영역(가상주소)
+	// dtb 영역을 reserved영역으로 잡아줌.
 	early_init_dt_reserve_memory_arch(__pa(initial_boot_params),
 					  fdt_totalsize(initial_boot_params),
 					  0);
+	/*
+	 * End Driving ...
+	 * 
+	 * 2016. 05. 14. (토) 18:13:02 KST
+	 * name : sim man seop 
+	 * 
+	 * */
 
 	/* Process header /memreserve/ fields */
 	for (n = 0; ; n++) {
@@ -1029,7 +1038,7 @@ void __init __weak early_init_dt_add_memory_arch(u64 base, u64 size)
 int __init __weak early_init_dt_reserve_memory_arch(phys_addr_t base,
 					phys_addr_t size, bool nomap)
 {
-	if (nomap)
+	if (nomap) 
 		return memblock_remove(base, size);
 	return memblock_reserve(base, size);
 }

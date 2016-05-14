@@ -1074,6 +1074,7 @@ void __init sanity_check_meminfo(void)
 	phys_addr_t memblock_limit = 0;
 	int highmem = 0;
 	phys_addr_t vmalloc_limit = __pa(vmalloc_min - 1) + 1; // 0x6f800000(라즈베리 파이 2 기준)
+								// __pa(virt_addr) 가상주소 => 물리주소로 변환
 	struct memblock_region *reg; // 자세한 내용은 memblock_region 내부를 참조!
 
 	for_each_memblock(memory, reg) {
@@ -1087,7 +1088,7 @@ void __init sanity_check_meminfo(void)
 		// 그렇지 않은 경우 size_limit를 변경한다.
 		else
 			size_limit = vmalloc_limit - reg->base;	// 루프 때 마다 size_limit이 바뀜.
-
+													// size_limit = memblock_region이 최대로 가질 수 있는 size
 		/*
 		 * 2016. 04. 30. (토) 21:21:33 KST
 		 * End
@@ -1124,12 +1125,12 @@ void __init sanity_check_meminfo(void)
 		}
 		// arm_lowmem_limit = 0, block_end = memblock의 마지막 주소(base + size)
 		if (!highmem) { 
-			if (block_end > arm_lowmem_limit) { // block_end(메모리)가 arm_lowmem_lit보다 큰 경우 arm_lowmem_limit을 update
-				if (reg->size > size_limit) // memblock 크기가 size_limit보다 큰 경우
+			if (block_end > arm_lowmem_limit) { // block_end(메모리)가 arm_lowmem_limit보다 큰 경우 arm_lowmem_limit을 update
+				if (reg->size > size_limit) // memblock 크기가 size_limit(memblock이 최대로 가질 수 있는 size)보다 큰 경우
 											// (블럭 사이즈가 lowmem 영역까지 남은 공간을 초과하는 경우 arm_lowmem_limit에 vmalloc_limit을 대입하고 그렇지 않은 경우 블럭의 끝을 지정)
-					arm_lowmem_limit = vmalloc_limit; 
-				else // 아닌 경우.
-					arm_lowmem_limit = block_end;
+					arm_lowmem_limit = vmalloc_limit; // vmalloc_limit 영역 까지 region 크기를 setting
+				else // 아닌 경우. // ZONE_DMA + ZONE_NORMAL 주소의 최댓값 == arm_lowmem_limit
+					arm_lowmem_limit = block_end; // 아닌 경우 block_end 를 lowmem_limit의 끝으로 설정.
 			}
 
 			/*
@@ -1156,7 +1157,7 @@ void __init sanity_check_meminfo(void)
 		}
 	}
 
-	high_memory = __va(arm_lowmem_limit - 1) + 1;
+	high_memory = __va(arm_lowmem_limit - 1) + 1; // high_memory 영역 계산, high_memory(여기서 부터 가상 주소가 시작 될 수 있음.)
 
 	/*
 	 * Round the memblock limit down to a section size.  This
@@ -1167,7 +1168,7 @@ void __init sanity_check_meminfo(void)
 		memblock_limit = round_down(memblock_limit, SECTION_SIZE); // memblock_limit을 SECTION_SIZE 로 alignment해줌.
 	if (!memblock_limit) // memblock의 시작주소와 끝 주소가 SECTION_SIZE 로 align되있는 경우.
 		memblock_limit = arm_lowmem_limit; // memblock_limit을 arm_lowmem_limit으로 설정해줌.
-
+												// lowmem 끝 주소 == memblock_limit
 	memblock_set_current_limit(memblock_limit); // memblock의 limit를 설정해줌
 }
 
@@ -1211,6 +1212,7 @@ static inline void prepare_page_table(void)
 				 PTRS_PER_PGD * PTRS_PER_PMD * sizeof(pmd_t))
 #else
 #define SWAPPER_PG_DIR_SIZE	(PTRS_PER_PGD * sizeof(pgd_t))
+						// PGD(Page global Directory) 의 크기.
 #endif
 
 /*
@@ -1222,14 +1224,14 @@ void __init arm_mm_memblock_reserve(void)
 	 * Reserve the page tables.  These are already in use,
 	 * and can only be in node 0.
 	 */
-	memblock_reserve(__pa(swapper_pg_dir), SWAPPER_PG_DIR_SIZE);
+	memblock_reserve(__pa(swapper_pg_dir), SWAPPER_PG_DIR_SIZE); // PG_DIR 영역을 reserve영역으로 설정
 
 #ifdef CONFIG_SA1111
 	/*
 	 * Because of the SA1111 DMA bug, we want to preserve our
 	 * precious DMA-able memory...
 	 */
-	memblock_reserve(PHYS_OFFSET, __pa(swapper_pg_dir) - PHYS_OFFSET);
+	memblock_reserve(PHYS_OFFSET, __pa(swapper_pg_dir) - PHYS_OFFSET); // SA1111 디바이스영역의 DMA 버그 때문에 그에 맞춰서 reserve영역으로 수정.
 #endif
 }
 

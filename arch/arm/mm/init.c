@@ -279,14 +279,21 @@ phys_addr_t __init arm_memblock_steal(phys_addr_t size, phys_addr_t align)
 
 void __init arm_memblock_init(const struct machine_desc *mdesc)
 {
+
+/* 2016. 05. 14. (토) 17:34:03 KST
+ * Name : sim man seop
+ * Start driving ...
+ * */
 	/* Register the kernel text, kernel data and initrd with memblock. */
 #ifdef CONFIG_XIP_KERNEL
 	memblock_reserve(__pa(_sdata), _end - _sdata); // 안탐.
 #else
-	memblock_reserve(__pa(_stext), _end - _stext); // 여기를 봅시다.
+	memblock_reserve(__pa(_stext), _end - _stext); // .stext 영역을  memblock_reverse영역으로 등록
 #endif
-#ifdef CONFIG_BLK_DEV_INITRD
+#ifdef CONFIG_BLK_DEV_INITRD // 램디스크 지원 여부.
 	/* FDT scan will populate initrd_start */
+	// RAMDISK 영역 주소 setting 하는 부분.
+	// .initrd 영역이 reserved 영역으로 등록.
 	if (initrd_start && !phys_initrd_size) {
 		phys_initrd_start = __virt_to_phys(initrd_start);
 		phys_initrd_size = initrd_end - initrd_start;
@@ -313,11 +320,22 @@ void __init arm_memblock_init(const struct machine_desc *mdesc)
 	}
 #endif
 
-	arm_mm_memblock_reserve();
+	arm_mm_memblock_reserve(); // pgd 를 reserved영역으로 잡아줌.
 
 	/* reserve any platform specific memblock areas */
-	if (mdesc->reserve)
+	if (mdesc->reserve) 
 		mdesc->reserve();
+	/* architecture 에 맞는 reserve() 함수를 호출
+	 * .reserve = h1940_reserve
+	 * 
+		674 static void __init h1940_reserve(void)
+		675 {
+		676     memblock_reserve(0x30003000, 0x1000); // base,size 순서.
+		677     memblock_reserve(0x30081000, 0x1000); // base,size 순서.
+		678 }
+		679 
+		mdesc->reserve() 가 이런식으로 이루어져 있음.
+	*/
 
 	early_init_fdt_scan_reserved_mem();
 

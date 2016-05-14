@@ -32,7 +32,7 @@ typedef u32 pmdval_t;
  */
 typedef struct { pteval_t pte; } pte_t;
 typedef struct { pmdval_t pmd; } pmd_t;
-typedef struct { pmdval_t pgd[2]; } pgd_t;
+typedef struct { pmdval_t pgd[2]; } pgd_t; 
 typedef struct { pteval_t pgprot; } pgprot_t;
 
 #define pte_val(x)      ((x).pte)

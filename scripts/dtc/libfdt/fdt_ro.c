@@ -90,7 +90,7 @@ static int _fdt_string_eq(const void *fdt, int stroffset,
 
 int fdt_get_mem_rsv(const void *fdt, int n, uint64_t *address, uint64_t *size)
 {
-	FDT_CHECK_HEADER(fdt);
+	FDT_CHECK_HEADER(fdt); // fdt header를 검사.(error checking 용)
 	*address = fdt64_to_cpu(_fdt_mem_rsv(fdt, n)->address);
 	*size = fdt64_to_cpu(_fdt_mem_rsv(fdt, n)->size);
 	return 0;
