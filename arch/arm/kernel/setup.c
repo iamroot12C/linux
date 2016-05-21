@@ -1020,6 +1020,10 @@ void __init setup_arch(char **cmdline_p)
  * */
 	arm_memblock_init(mdesc);
 
+/* Sat May 21 20:00:14 KST 2016
+ * End Driving ...
+ * name : daehee
+ */
 	paging_init(mdesc);
 	request_standard_resources(mdesc);
 

@@ -337,7 +337,7 @@ void __init arm_memblock_init(const struct machine_desc *mdesc)
 		mdesc->reserve() 가 이런식으로 이루어져 있음.
 	*/
 
-	early_init_fdt_scan_reserved_mem();
+	early_init_fdt_scan_reserved_mem();	// 안에 들어가면 주석 있음.
 
 	/* reserve memory for DMA contiguous allocations */
 	dma_contiguous_reserve(arm_dma_limit);

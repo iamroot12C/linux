@@ -466,7 +466,9 @@ static void __init build_mem_type_table(void)
 			/* Also setup NX memory mapping */
 			mem_types[MT_MEMORY_RW].prot_sect |= PMD_SECT_XN;
 		}
-		if (cpu_arch >= CPU_ARCH_ARMv7 && (cr & CR_TRE)) {
+		if (cpu_arch >= CPU_ARCH_ARMv7 && (cr & CR_TRE)) {	// CR_TRE=0 이면 TEX(Type extension field) remapping 이 disable
+															// MMU의 페이지테이블 속성 설정 (cacheable, bufferable 설정)
+															// 아래 주석 참조.
 			/*
 			 * For ARMv7 with TEX remapping,
 			 * - shared device is SXCB=1100
@@ -474,7 +476,7 @@ static void __init build_mem_type_table(void)
 			 * - write combine device mem is SXCB=0001
 			 * (Uncached Normal memory)
 			 */
-			mem_types[MT_DEVICE].prot_sect |= PMD_SECT_TEX(1);
+			mem_types[MT_DEVICE].prot_sect |= PMD_SECT_TEX(1);				// 위의 주석 참조
 			mem_types[MT_DEVICE_NONSHARED].prot_sect |= PMD_SECT_TEX(1);
 			mem_types[MT_DEVICE_WC].prot_sect |= PMD_SECT_BUFFERABLE;
 		} else if (cpu_is_xsc3()) {
@@ -488,7 +490,7 @@ static void __init build_mem_type_table(void)
 			mem_types[MT_DEVICE].prot_sect |= PMD_SECT_TEX(1) | PMD_SECT_BUFFERED;
 			mem_types[MT_DEVICE_NONSHARED].prot_sect |= PMD_SECT_TEX(2);
 			mem_types[MT_DEVICE_WC].prot_sect |= PMD_SECT_TEX(1);
-		} else {
+		} else {																	// TEX 리메핑 속성 없을 때.
 			/*
 			 * For ARMv6 and ARMv7 without TEX remapping,
 			 * - shared device is TEXCB=00001
@@ -510,6 +512,8 @@ static void __init build_mem_type_table(void)
 	/*
 	 * Now deal with the memory-type mappings
 	 */
+
+	// 위에서 CPU에 따른  캐시정책을 가져와서  설정해줌.
 	cp = &cache_policies[cachepolicy];
 	vecs_pgprot = kern_pgprot = user_pgprot = cp->pte;
 	s2_pgprot = cp->pte_s2;
@@ -533,12 +537,12 @@ static void __init build_mem_type_table(void)
 		(read_cpuid_ext(CPUID_EXT_MMFR0) & 0xF) == 4) {
 		user_pmd_table |= PMD_PXNTABLE;
 	}
-#endif
+#endif	// 우리는 64비트가 아니라서 통과함
 
 	/*
 	 * ARMv6 and above have extended page tables.
 	 */
-	if (cpu_arch >= CPU_ARCH_ARMv6 && (cr & CR_XP)) {
+	if (cpu_arch >= CPU_ARCH_ARMv6 && (cr & CR_XP)) {	// CR_XP : extended page table
 #ifndef CONFIG_ARM_LPAE
 		/*
 		 * Mark cache clean areas and XIP ROM read only

@@ -564,7 +564,7 @@ void __init early_init_fdt_scan_reserved_mem(void)
 	/* Reserve the dtb region */
 	// boot_param = dtb 시작 영역(가상주소)
 	// dtb 영역을 reserved영역으로 잡아줌.
-	early_init_dt_reserve_memory_arch(__pa(initial_boot_params),
+	early_init_dt_reserve_memory_arch(__pa(initial_boot_params),	// DTB(fdt header. structure block, ..., string block)영역 전체를 reserved 영역으로 잡아줌, 
 					  fdt_totalsize(initial_boot_params),
 					  0);
 	/*
@@ -575,9 +575,16 @@ void __init early_init_fdt_scan_reserved_mem(void)
 	 * 
 	 * */
 
+	/* Sat May 21 15:36:17 KST 2016
+	 * name : daehee
+	 * Start Driving ...
+	 *
+	 */
+
+	// DBT가 컴파일되서 바이너리로 생성되어 FDT형태로 메모리에 적재된다.
 	/* Process header /memreserve/ fields */
 	for (n = 0; ; n++) {
-		fdt_get_mem_rsv(initial_boot_params, n, &base, &size);
+		fdt_get_mem_rsv(initial_boot_params, n, &base, &size);	// FDT내의 memory reservation region내에 주소와 사이즈가 있는데, 주소를 따라가서  reserved 영역으로 만들어 줌,
 		if (!size)
 			break;
 		early_init_dt_reserve_memory_arch(base, size, 0);

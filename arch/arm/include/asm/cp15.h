@@ -54,7 +54,7 @@ extern unsigned long cr_alignment;	/* defined in entry-armv.S */
 static inline unsigned long get_cr(void)
 {
 	unsigned long val;
-	asm("mrc p15, 0, %0, c1, c0, 0	@ get CR" : "=r" (val) : : "cc");
+	asm("mrc p15, 0, %0, c1, c0, 0	@ get CR" : "=r" (val) : : "cc");	// coprocessor의 c1-c0-0 (System control registers)를 가져온다.
 	return val;
 }
 

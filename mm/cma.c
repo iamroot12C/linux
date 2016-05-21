@@ -243,7 +243,7 @@ int __init cma_declare_contiguous(phys_addr_t base,
 	 */
 	highmem_start = __pa_nodebug(high_memory);
 #else
-	highmem_start = __pa(high_memory);
+	highmem_start = __pa(high_memory);	// 우리는 여기임.
 #endif
 	pr_debug("%s(size %pa, base %pa, limit %pa alignment %pa)\n",
 		__func__, &size, &base, &limit, &alignment);
@@ -269,7 +269,7 @@ int __init cma_declare_contiguous(phys_addr_t base,
 		(phys_addr_t)PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order));
 	base = ALIGN(base, alignment);
 	size = ALIGN(size, alignment);
-	limit &= ~(alignment - 1);
+	limit &= ~(alignment - 1);		// align이 페이지를 몇개 합치냐애 따라 달라지므로 그에 맞춰서 리미트도 얼라인 시켜준다.
 
 	if (!base)
 		fixed = false;
@@ -298,7 +298,7 @@ int __init cma_declare_contiguous(phys_addr_t base,
 		limit = memblock_end;
 
 	/* Reserve memory */
-	if (fixed) {
+	if (fixed) {	// 이미 reserverd영역으로 되어있으면 이곳으로 들어가 예외처리를 해준다.
 		if (memblock_is_region_reserved(base, size) ||
 		    memblock_reserve(base, size) < 0) {
 			ret = -EBUSY;
@@ -336,7 +336,7 @@ int __init cma_declare_contiguous(phys_addr_t base,
 		base = addr;
 	}
 
-	ret = cma_init_reserved_mem(base, size, order_per_bit, res_cma);
+	ret = cma_init_reserved_mem(base, size, order_per_bit, res_cma);	// cma 구조체 세팅.
 	if (ret)
 		goto err;
 

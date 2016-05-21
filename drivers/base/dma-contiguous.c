@@ -48,7 +48,7 @@ struct cma *dma_contiguous_default_area;
  */
 static const phys_addr_t size_bytes = CMA_SIZE_MBYTES * SZ_1M;
 static phys_addr_t size_cmdline = -1;
-static phys_addr_t base_cmdline;
+static phys_addr_t base_cmdline;	// CMA 영역 시작주소가 들어가 있다.
 static phys_addr_t limit_cmdline;
 
 static int __init early_cma(char *p)
@@ -165,12 +165,12 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
 {
 	int ret;
 
-	ret = cma_declare_contiguous(base, size, limit, 0, 0, fixed, res_cma);
+	ret = cma_declare_contiguous(base, size, limit, 0, 0, fixed, res_cma);	// 정상일시 0 리턴
 	if (ret)
 		return ret;
 
 	/* Architecture specific contiguous memory fixup. */
-	dma_contiguous_early_fixup(cma_get_base(*res_cma),
+	dma_contiguous_early_fixup(cma_get_base(*res_cma),		// 아키텍쳐마다 DMA 영역이 다르므로 그거에 맞춰서 세팅
 				cma_get_size(*res_cma));
 
 	return 0;
